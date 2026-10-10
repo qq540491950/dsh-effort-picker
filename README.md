@@ -163,6 +163,9 @@ Error: cannot get property "remote.session" without inject
 - **文案硬编码中文**：没有注册 locale 命名空间（避免多一处失败面）。要跟随界面语言时补
   `ctx.locale.register(NS, {zh, en})` 并把 `locale: NS` 传给座位注册。
 - **切模型会重置档位**：与官方一致，带上新模型的 `defaultEffort`。
+- **面板 224px / 滑轨 200px**：渐变轨道不设自身宽度，直接撑满面板内容宽——尺寸就是
+  `styles.menu.width` 减去左右各 12px padding（224 − 24 = 200）。想再收窄滑轨只改这一个常量即可；
+  代价是面板里的模型名可显示的字符数变少。
 - **滑块 16px / 轨道 26px**：滑块用 `transform: translate(-50%,-50%)` 精确居中（不用 margin
   半像素），并用面板底色的一圈"缺口"加投影把它从渐变轨道上切出来（不用 brand 色描边——同色系会
   糊在一起）；拖动中关掉 `transition`（否则动画会拖在手速后面），静止时才用 `left .12s` 平滑吸附。
