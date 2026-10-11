@@ -518,12 +518,31 @@ check('aria-valuenow=3（medium）', track.props['aria-valuenow'] === 3, String(
 check('aria-valuetext=Medium', track.props['aria-valuetext'] === 'Medium', String(track.props['aria-valuetext']));
 let positioned = 0;
 walk(track, (node) => {
-	if (node.props?.style?.left !== undefined) positioned += 1;
+	// 停靠点与滑块都是"left 定位的小圆"（borderRadius 50%）；进度填充是 left:0 + 999px
+	// 胶囊圆角，单独断言，不计入这里。
+	if (node.props?.style?.left !== undefined && node.props?.style?.borderRadius === '50%') positioned += 1;
 });
 check('渲染出 5 个停靠点 + 1 个滑块', positioned === 6, String(positioned));
 const thumb = track.children[track.children.length - 1];
 check('滑块落在中间档位（ratio 0.5）', /0\.5\)$/.test(thumb.props.style.left), String(thumb.props.style.left));
-check('面板标题行显示当前档位', textOf(seatHandle.tree).includes('推理等级'), textOf(seatHandle.tree));
+// 进度填充是轨道里的第一个子节点（铺在停靠点与滑块下面）。
+const fill = track.children[0];
+check('进度填充铺到当前档位（ratio 0.5）', /0\.5\)$/.test(fill.props.style.width), String(fill.props.style.width));
+// 标题区改成"档位名居中 + 模型名居中带 ›"（参考 Codex 的档位面板），
+// 原来左侧的"推理等级"说明行与面板底部那一行模型已合并到这里。
+const headerTitle = findAll(
+	seatHandle.tree,
+	(node) => node.props?.style?.textAlign === 'center' && String(node.props?.style?.color).includes('brand-primary'),
+)[0];
+check(
+	'面板标题居中显示当前档位',
+	headerTitle !== undefined && textOf(headerTitle) === 'Medium',
+	textOf(seatHandle.tree),
+);
+check(
+	'标题下方的模型行是唯一的下钻入口',
+	findAll(seatHandle.tree, (node) => node.type === 'button' && node.props?.['aria-haspopup'] === 'menu').length === 1,
+);
 //#endregion
 
 //#region 8. 拖拽提交：一次手势只提交一次
@@ -575,6 +594,18 @@ check(
 	multiplier !== undefined && !['0', '0.25', '0.5', '0.75', '1'].includes(multiplier),
 	String(followThumb.props.style.left),
 );
+// 填充与滑块用同一个 centerAt(ratio)：宽度必须等于滑块的 left，否则进度条会与圆钮错位。
+const followFill = followTrackElement.type(followTrackElement.props).children[0];
+check(
+	'进度填充与滑块同一位置（同一个 centerAt）',
+	followFill.props.style.width === followThumb.props.style.left,
+	`fill=${String(followFill.props.style.width)} thumb=${String(followThumb.props.style.left)}`,
+);
+check(
+	'拖动中填充也关掉 transition（否则拖在手速后面）',
+	followFill.props.style.transition === 'none',
+	String(followFill.props.style.transition),
+);
 check('面板标题跟随最近的档位 High', textOf(followTree).includes('High'), textOf(followTree));
 const followTrackElement2 = findTrack(followTree);
 followTrackElement2.props.onPointerUp(fakePointerEvent(130));
@@ -612,10 +643,13 @@ clientExports.apply(modelHarness.ctx);
 const modelSeat = mountSeat(modelHarness);
 findAll(modelSeat.tree, (node) => node.props?.['aria-haspopup'] === 'dialog')[0].props.onClick();
 let modelTree = modelSeat.render();
-const rootRow = findAll(modelTree, (node) => node.type?.name === 'Row' && node.props?.role === undefined)[0];
-check('根面板有一个"模型"行', rootRow !== undefined);
-check('该行显示当前模型', textOf(rootRow).includes('deepseek-v4.1-flash'), textOf(rootRow));
-rootRow.props.onClick();
+const modelLine = findAll(
+	modelTree,
+	(node) => node.type === 'button' && node.props?.['aria-haspopup'] === 'menu',
+)[0];
+check('标题下方有"模型"下钻入口', modelLine !== undefined);
+check('该入口显示当前模型', textOf(modelLine).includes('deepseek-v4.1-flash'), textOf(modelLine));
+modelLine.props.onClick();
 modelTree = modelSeat.render();
 const modelRows = findByRole(modelTree, 'menuitemradio');
 check('模型列表渲染出 2 个模型', modelRows.length === 2, String(modelRows.length));
