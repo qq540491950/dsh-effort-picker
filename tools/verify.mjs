@@ -492,6 +492,20 @@ const triggerText = textOf(triggers[0]);
 check('触发器包含模型名', triggerText.includes('deepseek-v4.1-flash'), triggerText);
 check('触发器包含档位名', triggerText.includes('Medium'), triggerText);
 check('触发器 aria-label 含模型与档位', /推理等级 Medium/.test(triggers[0].props['aria-label']), triggers[0].props['aria-label']);
+// 触发器只留 模型名 + 档位 + chevron：那枚前导"数据库"图标按反馈去掉了。
+check(
+	'触发器不含前导图标（只有 模型名 / 档位 / chevron）',
+	triggers[0].children.filter(Boolean).length === 3,
+	String(triggers[0].children.length),
+);
+check('bundle 不再引用 IconDataOutlineRegular', !clientSource.includes('IconDataOutlineRegular'));
+// 紧凑模式（composer 把模型名藏起来）时档位必须留下，否则这一格只剩一个 chevron，像坏了。
+const effortSpan = findAll(triggers[0], (node) => node.props?.style?.flexShrink === 1000)[0];
+check(
+	'档位不跟模型名一起藏（紧凑模式也不会只剩 chevron）',
+	effortSpan !== undefined && !String(effortSpan.props.style.display).includes('var('),
+	String(effortSpan?.props.style.display),
+);
 check('面板默认关闭', seatHandle.tree.children.includes(null), 'panel 应为 null');
 //#endregion
 
