@@ -38,8 +38,8 @@ Codex 风格的推理档位面板。
 - **任何可能抛错的东西都不许放在 `inject` 工厂里**——那里抛错时座位组件连渲染机会都没有。
 - 目录解析推迟到渲染期的 `resolve()`，并由座位内的 `SeatBoundary` 兜住：失败降级成一行"点击重试"，
   条目不会被退役。`SeatBoundary` **不是可选项**，它包住的是整个座位子树。
-- 失败会写 `localStorage["codex-effort-picker:last-failure"]`，控制台只打第一条
-  （前缀 `[codex-effort-picker]`），随后 150ms ×12 次自动重试——重试是给"服务刚上电"这类瞬时失败用的。
+- 失败会写 `localStorage["dsh-effort-picker:last-failure"]`，控制台只打第一条
+  （前缀 `[dsh-effort-picker]`），随后 150ms ×12 次自动重试——重试是给"服务刚上电"这类瞬时失败用的。
 
 ### 2.2 Cordis 的 Service 方法以**调用方上下文**求值
 
@@ -129,7 +129,7 @@ bundle → Host 在 `/plugins` 下发布并写进浏览器 boot graph。
 ## 6. 提交与推送
 
 - 提交信息用中文 Conventional Commits，与既有历史一致：`feat:` / `fix:` / `chore:` / `docs:`，一行说清改了什么。
-- 推送目标固定：`origin` = `https://github.com/qq540491950/codex-effort-picker.git`，分支 `main`。
+- 推送目标固定：`origin` = `https://github.com/qq540491950/dsh-effort-picker.git`，分支 `main`。
 - **不要提交敏感信息**：profile 的 `cordis.patch.yml` 里有 API key（MCP / 搜索 provider），它**不在本仓库内**，
   永远不要把它、或它的片段、或任何 token 复制进本仓库。仓库里没有 `.env`，也不需要。
 - 提交前确认 `git status` 里没有意外文件；`.gitignore` 已覆盖 `node_modules/`、构建产物、`.env`、IDE/OS 垃圾。
@@ -139,19 +139,19 @@ bundle → Host 在 `/plugins` 下发布并写进浏览器 boot graph。
 | 症状 | 原因 | 恢复 |
 |---|---|---|
 | 界面里模型控件整个没了 | 条目被退役（2.1 / 2.3） | 重新保存一次 `lib/client.js`（内容不变也行，mtime/size 变了宿主就会发新 rev；用临时文件 + 原子替换更稳），或 `Ctrl+R` 刷新页面。不必重启 DSH |
-| 想看到失败原因 | — | 读 `localStorage["codex-effort-picker:last-failure"]`，或看控制台 `[codex-effort-picker]` 前缀（只有第一条） |
-| 想立刻回到官方控件 | — | 删掉 profile 里 `id: codex-effort-picker` 那个 insert 行，官方选择器立刻回来 |
+| 想看到失败原因 | — | 读 `localStorage["dsh-effort-picker:last-failure"]`，或看控制台 `[dsh-effort-picker]` 前缀（只有第一条） |
+| 想立刻回到官方控件 | — | 删掉 profile 里 `id: dsh-effort-picker` 那个 insert 行，官方选择器立刻回来 |
 
 ## 8. 只碰自己那一行
 
 profile 是**用户的环境**，不是本仓库的一部分：`C:\Users\admin\.dsh\profiles\desktop\cordis.patch.yml`。
-在里面**只允许增删 `id: codex-effort-picker` 这一个 insert 行**——其它条目的配置（模型、推理强度、
+在里面**只允许增删 `id: dsh-effort-picker` 这一个 insert 行**——其它条目的配置（模型、推理强度、
 搜索 provider、MCP、密钥）都不属于本任务范围，不要"顺手"改。补丁层里新增条目必须用 `insert:` 追加，
 裸写 `- id: ...` 会被当成覆盖目标，id 不存在时 Loader 报 `entry not found` 并丢弃该条。
 
 ## 9. 本机事实（会漂移，别当契约）
 
-- 仓库路径：`D:\project\dsh-plugins\codex-effort-picker`（profile 里的路径行依赖它）。
+- 仓库路径：`D:\project\dsh-plugins\dsh-effort-picker`（profile 里的路径行依赖它）。
 - profile 补丁：`C:\Users\admin\.dsh\profiles\desktop\cordis.patch.yml`。
 - Node：v24.14.1（自检只需标准库）。
 - 目标座位：`conversation.input.model`；被遮蔽的官方插件：`@deepseek-ai/dsh-client-ui-model-selection`。

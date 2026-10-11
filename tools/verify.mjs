@@ -1,5 +1,5 @@
 /**
- * codex-effort-picker 自检程序（纯 Node，无依赖）。
+ * dsh-effort-picker 自检程序（纯 Node，无依赖）。
  *
  * 它把 DSH 的投递链路和本插件的组件行为在本地"离线重放"一遍，不需要启动 DSH：
  *   1. package.json 是否满足 Host 的扫描契约；
@@ -448,7 +448,7 @@ check(
 );
 check(
 	'失败上报到控制台',
-	consoleErrors.some((line) => line.includes('codex-effort-picker')),
+	consoleErrors.some((line) => line.includes('dsh-effort-picker')),
 	consoleErrors.join(' | '),
 );
 check('失败后排了自动重试', pendingTimers.length === 1, String(pendingTimers.length));
@@ -678,8 +678,8 @@ if (!args.includes('--patch')) {
 		const parsed = yamlModule.parse(text);
 		check('patch 顶层是数组', Array.isArray(parsed), typeof parsed);
 		const rows = (Array.isArray(parsed) ? parsed : []).flatMap((entry) => entry.insert ?? []);
-		const row = rows.find((candidate) => candidate.id === 'codex-effort-picker');
-		check('存在 id=codex-effort-picker 的 insert 行', row !== undefined);
+		const row = rows.find((candidate) => candidate.id === 'dsh-effort-picker');
+		check('存在 id=dsh-effort-picker 的 insert 行', row !== undefined);
 		check('该行 name 指向宿主半边', row?.name === expectedName, String(row?.name));
 	}
 }

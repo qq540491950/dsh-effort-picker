@@ -1,4 +1,4 @@
-# codex-effort-picker
+# dsh-effort-picker
 
 把 DSH 桌面端（Web GUI）composer 里的**思考模式 / 推理档位**换成 Codex 风格面板的客户端插件。
 
@@ -58,8 +58,8 @@
 
 ```yaml
 - insert:
-    - id: codex-effort-picker
-      name: 'file:///D:/project/dsh-plugins/codex-effort-picker/lib/index.js'
+    - id: dsh-effort-picker
+      name: 'file:///D:/project/dsh-plugins/dsh-effort-picker/lib/index.js'
 ```
 
 `name` 必须指向本仓库的 `lib/index.js`（正斜杠形式）。**仓库一搬家就要同步改这一行。**
@@ -76,7 +76,7 @@ Host 在 `/plugins` 下发布并写进浏览器 boot graph。
 ## 自检
 
 ```powershell
-node D:\project\dsh-plugins\codex-effort-picker\tools\verify.mjs `
+node D:\project\dsh-plugins\dsh-effort-picker\tools\verify.mjs `
      --patch "C:\Users\admin\.dsh\profiles\desktop\cordis.patch.yml" `
      --yaml "C:\Users\admin\AppData\Local\Temp\dsh-asar-probe\out\dsh\node_modules\yaml"
 ```
@@ -92,7 +92,7 @@ node D:\project\dsh-plugins\codex-effort-picker\tools\verify.mjs `
 | 症状 | 怎么办 |
 |---|---|
 | 界面里模型控件整个没了 | 重新保存一次 `lib/client.js`（内容不变也行），或按 `Ctrl+R`。不必重启 DSH |
-| 想知道为什么失败 | 读 `localStorage["codex-effort-picker:last-failure"]`，或看控制台 `[codex-effort-picker]` 前缀的记录 |
+| 想知道为什么失败 | 读 `localStorage["dsh-effort-picker:last-failure"]`，或看控制台 `[dsh-effort-picker]` 前缀的记录 |
 | 想立刻回到官方控件 | 删掉 profile 里的 insert 行 |
 
 前两种都是"条目被退役"的表现，成因与恢复细节见 [AGENTS.md](AGENTS.md) 第 2、7 节。
@@ -118,7 +118,7 @@ node D:\project\dsh-plugins\codex-effort-picker\tools\verify.mjs `
 ## 目录结构
 
 ```
-codex-effort-picker/
+dsh-effort-picker/
   package.json      包清单：exports{"./client"} + dsh.client{platform:"web"}
   lib/index.js      宿主半边：空的 apply，只作为 Loader 的接线柱
   lib/client.js     浏览器半边：window.__ModuleLoader__ 懒 CJS bundle（全部 UI）
