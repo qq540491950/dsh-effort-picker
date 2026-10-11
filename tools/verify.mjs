@@ -705,6 +705,27 @@ const modelRows = findByRole(modelTree, 'menuitemradio');
 check('模型列表渲染出 2 个模型', modelRows.length === 2, String(modelRows.length));
 check('当前模型被标记为选中', modelRows[0].props.checked === true, String(modelRows[0].props.checked));
 check('模型列表按 provider 分组显示标题', textOf(modelTree).includes('cpa'), textOf(modelTree));
+// 分组标题必须和模型名分层（反馈：两者分不出来）：
+//   · 标题用 label-tertiary，比模型行的 label-primary 暗两档（官方 MenuGroup 的取值）；
+//   · 标题吸顶 + 官方那层 94% 不透明底色，滚动时盖住滑过去的模型行；
+//   · 分组容器是 role=group 并由标题命名（读屏不会把组名跟模型名连读）。
+const groupBox = findAll(modelTree, (node) => node.props?.role === 'group')[0];
+const groupHeading = findAll(modelTree, (node) => node.props?.style?.position === 'sticky')[0];
+check(
+	'分组容器是 role=group 且由标题命名',
+	groupBox !== undefined && String(groupBox.props['aria-label']).length > 0,
+	String(groupBox?.props['aria-label']),
+);
+// 模型行是 Row 组件元素（style 在组件内部算），所以从 bundle 源码里取它的文字色。
+const rowButtonColor = /rowButton:\s*\{[\s\S]*?color:\s*"([^"]+)"/.exec(clientSource)?.[1] ?? '';
+check(
+	'分组标题比模型名暗两档（label-tertiary、吸顶、带分组底色）',
+	String(groupHeading?.props.style.color).includes('label-tertiary') &&
+		!String(groupHeading?.props.style.color).includes('label-secondary') &&
+		String(groupHeading?.props.style.background).includes('menu-group-header-fill') &&
+		rowButtonColor.includes('label-primary'),
+	`heading=${String(groupHeading?.props.style.color)} row=${rowButtonColor}`,
+);
 check('当前模型行显示当前档位 Medium', textOf(modelRows[0]).includes('Medium'), textOf(modelRows[0]));
 check('其它模型行显示其默认档位 High', textOf(modelRows[1]).includes('High'), textOf(modelRows[1]));
 modelRows[1].props.onClick();
