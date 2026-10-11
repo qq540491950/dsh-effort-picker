@@ -32,7 +32,7 @@
 | `←` / `→` | 降/升一档并提交（焦点在触发器上即可，不必先点面板） |
 | `Home` / `End` | 跳到最低/最高档 |
 | `Esc` | 退回上一层；已在根层则关闭面板 |
-| 点击标题下方的模型名（带 ›） | 下钻到模型列表：按 provider 分组（分组标题比模型名**暗两档**且吸顶，见下），每行显示该模型的档位（当前模型显示**正在用的档位**，其它模型显示**选中后会生效的默认档位**），选中后带上该模型的默认档位 |
+| 点击标题下方的模型名（带 ›） | 下钻到模型列表：按 provider 分成一张张圆角卡片（卡片头是组名，比模型名**暗两档**，见下），每行显示该模型的档位（当前模型显示**正在用的档位**，其它模型显示**选中后会生效的默认档位**），选中后带上该模型的默认档位 |
 | 点击面板外 | 关闭 |
 
 档位数是**自适应**的：直接取当前模型 `reasoning.efforts` 的长度。本机
@@ -103,11 +103,14 @@ node D:\project\dsh-plugins\dsh-effort-picker\tools\verify.mjs `
   （官方把 DeepSeek Account 排在最前）。官方在 ≤4 个模型时也不显示搜索框；模型变多后需要补上
   （`/model` 命令弹窗仍是完整功能的那一个）。
 - **文案硬编码中文**：没有注册 locale 命名空间（避免多一处失败面）。
-- **分组标题与模型名分层**：组名用 `--dsw-alias-label-tertiary`（比模型行的 `label-primary` 暗两档，
-  与官方 `MenuGroup` 的取值一致）+ `position: sticky` + 官方那层 `--dsw-alias-menu-group-header-fill`，
-  滚动时标题会盖住滑过去的模型行；分组容器是 `role="group"` 并由标题命名、标题本身 `aria-hidden`，
-  读屏不会把组名跟模型名连读。没有直接用官方 `MenuGroup` 组件，是为了不引入
-  `observeStickyMenuGroups` 那套观察器（多一个失败面），视觉与语义都对齐了。
+- **每个 provider 是一张圆角卡片**：只靠字色/字号分层被反馈"依然不明显"，所以整组用
+  `1px solid var(--dsw-alias-border-l3)`（12%/16% 不透明度；`border-l1` 只有 4%/6%，框不出来）
+  + `var(--dsw-radius-md)` 圆角 + `color-mix(label-primary 5%, transparent)` 掺色底框起来。
+  组名另外用 `--dsw-alias-label-tertiary`（比模型行的 `label-primary` 暗两档，与官方 `MenuGroup`
+  取值一致）+ 11px/500/字距，读起来是"标签"而不是模型名。
+  分组容器是 `role="group"` 并由组名命名、可见组名 `aria-hidden`，读屏不会把组名跟模型名连读。
+  没有直接用官方 `MenuGroup` 组件，是为了不引入 `observeStickyMenuGroups` 那套观察器
+  （多一个失败面）；卡片形态下也刻意不做吸顶——组名会浮在卡片边框外面，反而更乱。
 - **切模型会重置档位**：与官方一致，带上新模型的 `defaultEffort`。
 - **面板 224px / 滑轨 200px**：轨道不设自身宽度，直接撑满面板内容宽——尺寸就是
   `styles.menu.width` 减去左右各 12px padding（224 − 24 = 200）。想再收窄滑轨只改这一个常量即可；
