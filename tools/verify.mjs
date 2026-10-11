@@ -506,6 +506,15 @@ check(
 	effortSpan !== undefined && !String(effortSpan.props.style.display).includes('var('),
 	String(effortSpan?.props.style.display),
 );
+// 主次分明：模型名继承触发器的 label-secondary，档位用 label-caption（更浅），
+// 不再用 brand 色——否则档位比模型名还抢眼。
+check(
+	'档位比模型名浅（label-caption，不再是 brand 色）',
+	String(effortSpan?.props.style.color).includes('label-caption') &&
+		String(triggers[0].props.style.color).includes('label-secondary') &&
+		!String(effortSpan?.props.style.color).includes('brand-primary'),
+	`effort=${String(effortSpan?.props.style.color)} trigger=${String(triggers[0].props.style.color)}`,
+);
 check('面板默认关闭', seatHandle.tree.children.includes(null), 'panel 应为 null');
 //#endregion
 
