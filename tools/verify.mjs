@@ -543,6 +543,25 @@ check(
 	'标题下方的模型行是唯一的下钻入口',
 	findAll(seatHandle.tree, (node) => node.type === 'button' && node.props?.['aria-haspopup'] === 'menu').length === 1,
 );
+// 主题适配的三条护栏：菜单面是半透明材质，裸用 bg-layer-2 时轨道会与面板同色
+// （深色主题 #43454a73 换算出来≈#2c2c2e；浅色主题两者都接近白），所以轨道必须掺一档
+// label-primary；浅色主题里白点/白圆钮还要靠描边勾边界。
+check(
+	'轨道底色掺了 label-primary（两种主题下都与面板差一档）',
+	/color-mix\(in srgb, var\(--dsw-alias-label-primary\)/.test(String(track.props.style.backgroundColor)),
+	String(track.props.style.backgroundColor),
+);
+check(
+	'滑块带描边 + 投影（浅色主题下也能看出边界）',
+	String(thumb.props.style.boxShadow).includes('rgba(0, 0, 0'),
+	String(thumb.props.style.boxShadow),
+);
+const tickNode = findAll(track, (node) => node.props?.style?.width === '4px')[0];
+check(
+	'停靠点带描边（浅色主题下也看得见）',
+	String(tickNode?.props.style.boxShadow).includes('rgba(0, 0, 0'),
+	String(tickNode?.props.style.boxShadow),
+);
 //#endregion
 
 //#region 8. 拖拽提交：一次手势只提交一次
@@ -607,6 +626,14 @@ check(
 	String(followFill.props.style.transition),
 );
 check('面板标题跟随最近的档位 High', textOf(followTree).includes('High'), textOf(followTree));
+// 触发器在面板**外面**：它必须只显示已提交档位。跟手变的话，下方控件会在
+// Low/Medium/High 之间来回跳、宽度也跟着抖——反馈里明确点过这条。
+const followTrigger = findAll(followTree, (node) => node.props?.['aria-haspopup'] === 'dialog')[0];
+check(
+	'拖动中触发器文案不跟手跳（仍是已提交的 Medium）',
+	textOf(followTrigger).includes('Medium') && !textOf(followTrigger).includes('High'),
+	textOf(followTrigger),
+);
 const followTrackElement2 = findTrack(followTree);
 followTrackElement2.props.onPointerUp(fakePointerEvent(130));
 check(
