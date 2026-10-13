@@ -92,6 +92,9 @@ ctx.inject(["slots", "modelDirectories", "sessions", "remote", "remote.session"]
 | 触发器**不放前导图标**（`IconDataOutlineRegular` 已去掉），且 `triggerEffort` 不跟 `--dsh-composer-model-text-display` 一起藏 | 位置和宽度仍与官方一致，但那枚"数据库"图标是多余的（反馈点掉）；紧凑模式官方会退化成"只剩一枚图标"，我们没图标了，档位必须留住，否则只剩一个 chevron 像坏了 | verify 第 6 节 |
 | 触发器里模型名是 `label-secondary`、档位是 `label-caption`（比模型名浅一号，**不是** brand 色）；模型列表每个 provider 是一张圆角卡片（`border-l3` + `var(--dsw-radius-md)` + `color-mix(label-primary 5%, transparent)` 底），组名用 `label-tertiary`（比模型行的 `label-primary` 暗两档） | 文字层级要分得出主次：触发器里"模型名 · 档位"（反馈：档位的字浅一点），列表里"分组名 vs 模型名"（反馈两轮：只调字色"依然不明显"，所以整组框起来）。卡片不能用 `border-l1`（4%/6% 不透明度，框不出来），底色不能裸用 `bg-layer-2`（与半透明菜单面同色）；卡片形态下不做吸顶，否则组名会浮在边框外 | verify 第 6、10 节 |
 | 面板 `width: "224px"` 与轨道 200px 同源 | 轨道不设自身宽度，撑满内容宽 = 面板宽 − 左右各 12px padding；改面板宽等于改轨道宽 | 人工 |
+| `chooseModel` 必须带上新模型的**最高档**（`efforts.at(-1).id`），既不能省略 `reasoningEffort`、也不能用路由默认档 `defaultEffort` | 省略 = 会话档位被清空 → 选择器 `activeIndex = -1` → 轨道不渲染滑块头，用户看到"滑块不行"；路由默认档是"一条路由一个值"，huawei 设成 high 后连支持 max 的模型也落在 high（两条都是实测反馈）。**只影响"刚切过去落在哪一格"，滑块照旧能拖到任意档** | verify 第 10 节（含"没有 defaultEffort 的模型也要带上最高档"） |
+| 只要模型有档位，轨道上就必须画得出滑块头：`shownIndex = activeIndex >= 0 ? activeIndex : efforts.length - 1`；兜底时 `committedLabel` / `effortLabel` 补「（默认）」后缀 | 会话档位没显式设置时（官方 `/model` 切换）旧实现 `shownRatio = null` → thumb / fill 全不渲染，轨道看起来就是坏的；补后缀是为了不把兜底位置说成用户选过的档位 | verify 第 8c 组 |
+| 模型列表里非当前模型显示的是**选中它会带上的档位**（= 该模型最高档），不是 `defaultEffort` | 显示路由默认档时同一条路由每个模型都是同一个值（huawei 全显示 High），看不出谁支持 max | verify 第 10 节 |
 
 **不要顺手做的重构**：不加依赖、不引入构建/打包工具、不把 `lib/client.js` 拆成多文件（它必须是一个
 classic script，不是 ESM）、不改有意的硬编码、不"美化"间距到与现状不一致（diff 越小越好）。
@@ -125,13 +128,14 @@ bundle → Host 在 `/plugins` 下发布并写进浏览器 boot graph。
    "看起来没问题"替代实际输出。
 5. 提交（第 6 节）并推送。
 
-自检覆盖 14 个分组（含 `4b` 降级、`8b` 连续跟手）共 87 条断言：包清单契约、宿主 `apply`、模块协议、
-`priority -1` 注册与注入清单回归护栏、`resolve()` 解析、解析失败时座位内降级（不退役条目、上报控制台、
-排自动重试）、子代理会话短路、触发器文案（含"不放前导图标、紧凑模式保留档位、档位比模型名浅"）、
-滑杆 ARIA、停靠点数量、进度填充与滑块同源、主题适配（轨道掺色 / 圆钮与停靠点带描边）、拖拽只提交一次
-且触发器不跟手跳、键盘调档、模型下钻（含"分组圆角卡片 + 组名暗两档 + role=group"）、失败提示保留面板、
-profile 接线。第 12 节会把 patch 里的路径行与**本机实际路径**比对，所以**仓库一搬家就必须同步改 profile
-里的路径行**（forward slash 形式）。
+自检覆盖 15 个分组（含 `4b` 降级、`8b` 连续跟手、`8c` 档位未设置时的滑块头）共 93 条断言：包清单契约、
+宿主 `apply`、模块协议、`priority -1` 注册与注入清单回归护栏、`resolve()` 解析、解析失败时座位内降级
+（不退役条目、上报控制台、排自动重试）、子代理会话短路、触发器文案（含"不放前导图标、紧凑模式保留档位、
+档位比模型名浅"）、滑杆 ARIA、停靠点数量、进度填充与滑块同源、主题适配（轨道掺色 / 圆钮与停靠点带描边）、
+拖拽只提交一次且触发器不跟手跳、键盘调档、模型下钻（含"分组圆角卡片 + 组名暗两档 + role=group"、
+"选模型带最高档 / 列表显示选中会带上的档位"）、档位未显式设置时滑块头仍在最高档且标「默认」、
+失败提示保留面板、profile 接线。第 12 节会把 patch 里的路径行与**本机实际路径**比对，所以**仓库一搬家
+就必须同步改 profile 里的路径行**（forward slash 形式）。
 
 ## 6. 提交与推送
 
