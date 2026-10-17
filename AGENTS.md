@@ -95,7 +95,8 @@ ctx.inject(["slots", "modelDirectories", "sessions", "remote", "remote.session"]
 | 宿主半边零 `import`、导出 `apply` | 它只当接线柱；多引入依赖就多一个失败面 | verify 第 2 节 |
 | 文案硬编码中文、**不注册 locale 命名空间** | 有意少一个失败面 | 约定 |
 | 数据面只走官方 `ctx.modelDirectories` 的 `directory.store` / `directory.select()`，写入只作用于**下一次请求** | 与 `/model` 命令看到的状态天然一致 | 约定 |
-| 滑块 `THUMB_SIZE = 25`、`styles.thumb` 的 `25px` 与 `styles.track.height` 的 `18px` 是一套比例 | 白圆钮刻意比轨道大得多（25/18 ≈ 1.39:1，上下各探出 3.5px）——这是 Codex 档位面板的样子；三者不一致就会看出偏移 | 人工 |
+| 滑块 `THUMB_SIZE = 25`、`styles.thumb` 的 `25px` 与 `styles.track.height` 的 `22px` 是一套比例 | 参考图（Codex 档位面板，面板 310px）里轨道 30px、圆钮 34.5px，即占面板宽的 9.7% / 11.1%；本面板 224px 等比换成 22px / 25px，比值 1.14:1，圆钮上下各探出 1.5px。三者不一致就会看出偏移 | 人工 |
+| 进度填充是**纯色 `#88c0d0`**（不掺 token、无渐变、无高光） | 这是从参考图实测取的颜色（136/192/208），参考图的填充横竖都是这个值。早先那版 brand 渐变 + 白高光是照着另一张图猜的，已被明确撤掉——**别"美化"回渐变** | 人工 |
 | 进度填充的 `width` 与滑块的 `left` 必须同用 `centerAt(ratio)` | 填充右端永远被滑块盖住，两者一旦不同源就会露出接缝 | verify 第 8b 组 |
 | 轨道底色必须掺一档 `label-primary`（**不能**裸用 `bg-layer-2`），白点/白圆钮必须带描边 | 菜单面是半透明材质：裸 `bg-layer-2` 与面板同色（深色主题两者都≈`#2c2c2e`，浅色主题都≈白）→ 滑轨整条看不见、圆钮在浅色主题里也没有边界。实测踩过 | verify 第 7 节 |
 | 触发器只显示**已提交**档位（`committedLabel`）；拖动预览（`effortLabel`）只允许出现在面板标题里 | 触发器在面板外面，跟着拖动预览变会让下方控件在 Low/Medium/High 之间跳、宽度跟着抖 | verify 第 8b 组 |

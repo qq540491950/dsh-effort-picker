@@ -707,7 +707,7 @@ check(
 );
 // 主题适配的三条护栏：菜单面是半透明材质，裸用 bg-layer-2 时轨道会与面板同色
 // （深色主题 #43454a73 换算出来≈#2c2c2e；浅色主题两者都接近白），所以轨道必须掺一档
-// label-primary；浅色主题里白点/白圆钮还要靠描边勾边界。
+// label-primary；浅色主题里白圆钮靠描边、白点靠掺 label-primary 变浅灰点，才不会消失。
 check(
 	'轨道底色掺了 label-primary（两种主题下都与面板差一档）',
 	/color-mix\(in srgb, var\(--dsw-alias-label-primary\)/.test(String(track.props.style.backgroundColor)),
@@ -720,9 +720,9 @@ check(
 );
 const tickNode = findAll(track, (node) => node.props?.style?.width === '4px')[0];
 check(
-	'停靠点带描边（浅色主题下也看得见）',
-	String(tickNode?.props.style.boxShadow).includes('rgba(0, 0, 0'),
-	String(tickNode?.props.style.boxShadow),
+	'停靠点掺了 label-primary（浅色主题下变浅灰点，而不是彻底消失的裸白点）',
+	String(tickNode?.props.style.background).includes('--dsw-alias-label-primary'),
+	String(tickNode?.props.style.background),
 );
 //#endregion
 

@@ -2,7 +2,7 @@
   "name": "dsh-effort-picker",
   "version": "0.0.1",
   "private": true,
-  "description": "DSH Web 客户端插件：把 composer 的思考模式（reasoning effort）换成 Codex 风格的渐变滑杆。TypeScript 源码 + esbuild 产物。",
+  "description": "DSH Web 客户端插件：把 composer 的思考模式（reasoning effort）换成 Codex 风格的档位滑杆（浅蓝滑轨 + 白圆钮）。TypeScript 源码 + esbuild 产物。",
   "type": "module",
   "main": "lib/index.js",
   "files": [

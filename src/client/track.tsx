@@ -1,5 +1,5 @@
 /**
- * 档位轨道：品牌色进度填充 + 离散停靠点 + 连续跟手的白色滑块。
+ * 档位轨道：浅蓝进度填充 + 离散停靠点 + 连续跟手的白色滑块。
  *
  * 三个不变量（`tools/verify.mjs` 第 7、8b 组盯着它们）：
  *   · 子节点顺序是「填充 → 停靠点 → 滑块」，最后一个永远是滑块（拖动相关的断言按这个取）；
@@ -48,7 +48,8 @@ export function EffortTrack(props: EffortTrackProps) {
 					...(props.dragging ? styles.thumbActive : {}),
 					left: centerAt(props.shownRatio),
 					// 拖动时 left 由 pointermove 直接写（要的是零延迟），所以过渡只留给"放大"这一下。
-					transform: `translate(-50%, -50%) scale(${props.dragging ? '1.06' : '1'})`,
+					// 参考图里没有光晕可用，按下去只做极轻微的放大（1.04）+ 加深落影，够当按压反馈了。
+					transform: `translate(-50%, -50%) scale(${props.dragging ? '1.04' : '1'})`,
 					transition: props.dragging
 						? 'transform .12s ease-out'
 						: 'left .12s ease-out, transform .12s ease-out',

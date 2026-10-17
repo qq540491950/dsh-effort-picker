@@ -1,11 +1,11 @@
 {
   "name": "dsh-effort-picker",
   "tool": "esbuild@0.28.2",
-  "sourceTree": "fa4d6c1367c0620a5ee312eaec25d831ad5442344f69644cadbf7085d0dacbe2",
+  "sourceTree": "8dbea165a4c64e91c63e6010964d689ce7d2099d4a3265cf08176a959b42aacd",
   "targets": [
     {
       "output": "lib/client.js",
-      "outputSha256": "f80eb4a362ff0ecbb52f6e61a5b203bb5fd4e0bbea304c6f99029abbc0c78920",
+      "outputSha256": "9f6e7cdda359c674c18363a3b6187c9010bb9a91b56a6d35dbe0788cab6ecc3f",
       "inputs": {
         "src/client/boundary.tsx": "d9b8056065bc8f54ff198d840ce84c2936fef60eacd5e2d007d1285cea07e880",
         "src/client/dom.ts": "0707cc0378817268683dd819c6a6ed1449946ae1b26c4a920265499811df3c13",
@@ -16,8 +16,8 @@
         "src/client/placement.ts": "e7b5a7ed7e9153db1a694276b868d648e2e853157597d5b2f9ae336cfc4a58d4",
         "src/client/platform.ts": "389db0269532b9e8329031238c9c547584da169bce4c3838632834a0e15431a0",
         "src/client/row.tsx": "edb6460e6ecd2f69d46659b46221040fb407d6ec3de4eaa5401f5566fe26dbf5",
-        "src/client/styles.ts": "0b16a78286df46f6fcae8822a6524751616c55c8a2a8709e148ceb1f2173e829",
-        "src/client/track.tsx": "4a75b2abd8addf87eaebc9046a33df9345d11fc516e28bcefd0e20970647fe2a"
+        "src/client/styles.ts": "3d01620096f07eac12932a39d3c2fb983f1d6a7167e4511717f65c276bdd6ea5",
+        "src/client/track.tsx": "8dcf17d551613ac09c27e7ddbf9ac95226015d7f09d925a0ddc8775a5a10ab8c"
       }
     },
     {
