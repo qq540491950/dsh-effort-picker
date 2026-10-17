@@ -17,8 +17,9 @@
  *   node tools/verify.mjs --patch <...> --yaml <yaml 包目录>
  */
 
-import { readFileSync, existsSync } from 'node:fs';
-import { join, dirname, resolve, isAbsolute } from 'node:path';
+import { readFileSync, existsSync, readdirSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { join, dirname, resolve, isAbsolute, relative } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import vm from 'node:vm';
 
@@ -376,6 +377,41 @@ check('exports["./client"] 存在', typeof manifest.exports?.['./client'] === 's
 check('exports["./package.json"] 存在', manifest.exports?.['./package.json'] === './package.json');
 check('客户端 bundle 文件真实存在', existsSync(clientPath), clientPath);
 check('dsh.client.platform === "web"', manifest.dsh?.client?.platform === 'web');
+
+// 源码是 TypeScript、产物是 lib/*.js：中间必须有一次构建。缺了这道检查就会出现
+// "改完源码、自检全绿、线上跑旧产物"——正是 AGENTS.md 第 2.3 节那类事故的翻版。
+const buildManifestPath = join(PACKAGE_ROOT, 'lib/.build-manifest.json');
+const buildManifest = existsSync(buildManifestPath)
+	? JSON.parse(readFileSync(buildManifestPath, 'utf8'))
+	: null;
+check('存在构建清单 lib/.build-manifest.json', buildManifest !== null, buildManifestPath);
+if (buildManifest !== null) {
+	const sha256 = (path) => createHash('sha256').update(readFileSync(path)).digest('hex');
+	const stale = [];
+	for (const target of buildManifest.targets ?? []) {
+		for (const [input, digest] of Object.entries(target.inputs ?? {})) {
+			if (!existsSync(join(PACKAGE_ROOT, input)) || sha256(join(PACKAGE_ROOT, input)) !== digest) stale.push(input);
+		}
+		if (sha256(join(PACKAGE_ROOT, target.output)) !== target.outputSha256) stale.push(target.output);
+	}
+	check(
+		'产物与源码一致（src 改了必须重新 npm run build）',
+		stale.length === 0,
+		stale.length === 0 ? undefined : `已过期：${stale.join(', ')}`,
+	);
+	// 上面按 target.inputs 逐项比对，管的是"打包器真的读了的文件"；
+	// 这里再比一次整棵 src/ 树，于是**新增文件**和**只影响类型的文件**（model.ts /
+	// services.ts / *.d.ts 不会进 bundle）也不会漏掉。
+	const sourceFiles = readdirSync(join(PACKAGE_ROOT, 'src'), { recursive: true, withFileTypes: true })
+		.filter((entry) => entry.isFile())
+		.map((entry) => relative(PACKAGE_ROOT, join(entry.parentPath, entry.name)).replaceAll('\\', '/'))
+		.sort();
+	const treeParts = sourceFiles.map(
+		(file) => `${file}\u0000${createHash('sha256').update(readFileSync(join(PACKAGE_ROOT, file))).digest('hex')}`,
+	);
+	const treeDigest = createHash('sha256').update(treeParts.join('\n')).digest('hex');
+	check('src/ 整棵树与构建清单一致（新增/删除文件也算）', treeDigest === buildManifest.sourceTree, treeDigest);
+}
 //#endregion
 
 //#region 2. 宿主半边
@@ -389,6 +425,27 @@ section('3) 浏览器半边：模块协议');
 const { registration, exports: clientExports } = loadClientBundle();
 check('bundle id 等于 package.json 的 name', registration.id === manifest.name, registration.id);
 check('bundle 导出 apply 函数', typeof clientExports.apply === 'function', typeof clientExports.apply);
+// 运行期只能向平台种子表要模块（打包进去的第三方包不在这个名单里）。
+// 这条盯的是"某个依赖被误标成 external"——那种产物在浏览器里会直接 require 失败。
+const SEED_SPECIFIERS = [
+	'react',
+	'react-dom',
+	'cordis',
+	'dsh-client-store',
+	'ui-slots',
+	'ui-primitives',
+	'ui-dockkit',
+	'@deepseek-ai/dsh-client-store',
+	'@deepseek-ai/dsh-client-ui-slots',
+	'@deepseek-ai/dsh-client-ui-primitives',
+	'@deepseek-ai/dsh-client-ui-dockkit',
+];
+const requireTargets = [...new Set([...clientSource.matchAll(/require\("([^"]+)"\)/g)].map((match) => match[1]))];
+check(
+	'产物只向平台要种子模块',
+	requireTargets.length > 0 && requireTargets.every((target) => SEED_SPECIFIERS.includes(target)),
+	requireTargets.join(', '),
+);
 //#endregion
 
 //#region 4. 座位注册
@@ -764,6 +821,27 @@ check(
 	findAll(afterFail, (node) => typeof node.type === 'function' && node.type.name === 'EffortTrack').length === 1,
 );
 check('显示出会话占用提示', textOf(afterFail).includes('另一个 DSH 实例'), textOf(afterFail));
+//#endregion
+
+//#region 11b. 面板落位
+// 面板是挂在 body 上的 fixed 浮层，位置只能自己算。打开的第一帧用纯函数估算
+// （`placement.ts` 的 `estimatePanelPosition`），之后由 floating-ui 的 autoUpdate 跟随。
+// 这里只测纯函数——它是"打开瞬间不跳位 / 贴边不越界"的全部逻辑。
+section('11b) 面板落位（打开瞬间的同步估算）');
+const estimate = clientExports.estimatePanelPosition;
+check('bundle 导出落位估算函数', typeof estimate === 'function', typeof estimate);
+if (typeof estimate === 'function') {
+	const size = { width: 224, height: 200 };
+	const viewport = { width: 1280, height: 800 };
+	const normal = estimate({ top: 700, bottom: 728, left: 100, right: 300 }, size, viewport);
+	check('默认贴着触发器上方、右对齐', normal.top === 492 && normal.left === 76, JSON.stringify(normal));
+	const flipped = estimate({ top: 40, bottom: 68, left: 100, right: 300 }, size, viewport);
+	check('上方放不下时翻到下方（不盖住触发器、不越出下沿）', flipped.top === 76, JSON.stringify(flipped));
+	const farRight = estimate({ top: 700, bottom: 728, left: 1100, right: 1270 }, size, viewport);
+	check('右边缘不越界', farRight.left === 1044, JSON.stringify(farRight));
+	const farLeft = estimate({ top: 700, bottom: 728, left: 0, right: 40 }, size, viewport);
+	check('左边缘不越界', farLeft.left === 12, JSON.stringify(farLeft));
+}
 //#endregion
 
 //#region 12. profile 接线

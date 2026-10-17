@@ -1,0 +1,16 @@
+# pnpm 12 起，安装期设置只从 `pnpm-workspace.yaml` 读取（package.json 里的 `pnpm` 字段已失效）。
+#
+# 只声明包根自己，安装行为与单包项目一致；这里唯一的作用是允许 esbuild 跑 postinstall
+# （它只做平台二进制校验/落位），否则 pnpm 会以 ERR_PNPM_IGNORED_BUILDS 退出。
+packages:
+  - .
+
+onlyBuiltDependencies:
+  - esbuild
+
+autoInstallPeers: false
+
+# esbuild 的 postinstall 只做平台二进制校验；即使被跳过，@esbuild/win32-x64 这类
+# optional 依赖也已装好，构建照常可用（tools/build.ts 启动时会自检一次）。
+# 这里不因为"有被跳过的构建脚本"而让整个 install 以 1 退出。
+strictDepBuilds: false

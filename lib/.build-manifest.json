@@ -1,0 +1,31 @@
+{
+  "name": "dsh-effort-picker",
+  "tool": "esbuild@0.28.2",
+  "sourceTree": "51bfbec6ce8cfa7a97b23de5176653b1244a554aff49d425fa189fdd9b5e7141",
+  "targets": [
+    {
+      "output": "lib/client.js",
+      "outputSha256": "fc6d976c5a1523a509fdff4c0e8c27e3b94a01362a9645cccfe62fc2fc4db778",
+      "inputs": {
+        "src/client/boundary.tsx": "d9b8056065bc8f54ff198d840ce84c2936fef60eacd5e2d007d1285cea07e880",
+        "src/client/dom.ts": "0707cc0378817268683dd819c6a6ed1449946ae1b26c4a920265499811df3c13",
+        "src/client/geometry.ts": "1bd26685e5db5aaa344e2fadcccad09912b5938809daa60532876a8bf2fe8682",
+        "src/client/hooks.ts": "83cccb2a6be3f7d472c6d8a5ce37b81309029df1ec2017fdf67529bc8a831177",
+        "src/client/index.ts": "2c1ab94236b143f7e885755acd8360ee56841e3a40e7332b6e2f367047d0e4b8",
+        "src/client/picker.tsx": "5579b291ccae1f426f648426450a80dbec98b959d25ad0c7a5b10aba4c61ff7c",
+        "src/client/placement.ts": "e7b5a7ed7e9153db1a694276b868d648e2e853157597d5b2f9ae336cfc4a58d4",
+        "src/client/platform.ts": "389db0269532b9e8329031238c9c547584da169bce4c3838632834a0e15431a0",
+        "src/client/row.tsx": "7179396366b9eab8b9989b9a59f960f5d6caf5f81987fc9e2e9761db3a9ab085",
+        "src/client/styles.ts": "058aadcdaa25652670713f9cee831fc03570a27d277c0bcd12ff0b3500536a56",
+        "src/client/track.tsx": "7ee3ca8187bb80dde2d2671f857793f1fa585eef0d5004000ddd2e8aa5b6da49"
+      }
+    },
+    {
+      "output": "lib/index.js",
+      "outputSha256": "786edda3847772ac658f66f6054bc1ab89809a6b7bc61d0a75abf3efde98df6e",
+      "inputs": {
+        "src/host/index.ts": "4e55e392971d18f6c1361f223854cafcda37c57dca99b2ce4e7559acf3df8526"
+      }
+    }
+  ]
+}

@@ -4,6 +4,9 @@
 
 > 自用维护的小插件，不发布（`package.json` 里 `"private": true`）。全部行为只在浏览器侧，
 > 宿主侧是空的接线柱；删掉接线就立刻回到官方界面。工程约束与硬规则见 [AGENTS.md](AGENTS.md)。
+>
+> 源码是 TypeScript（`src/`），投递产物是 esbuild 打出来的 `lib/client.js` / `lib/index.js`。
+> 装插件**不需要** pnpm（`file://` 直接指向 `lib/index.js`）；**改代码需要**——见「开发」。
 
 ## 它长什么样
 
@@ -53,8 +56,8 @@
 
 ## 安装（接线）
 
-不需要 pnpm、不需要 `node_modules`、不改 profile 的 `package.json`。只在
-`C:\Users\admin\.dsh\profiles\desktop\cordis.patch.yml` 末尾加一个 insert 行：
+装插件本身不需要 pnpm、不需要 `node_modules`、不改 profile 的 `package.json`（仓库里已提交
+构建好的 `lib/`）。只在 `C:\Users\admin\.dsh\profiles\desktop\cordis.patch.yml` 末尾加一个 insert 行：
 
 ```yaml
 - insert:
@@ -73,6 +76,19 @@ Host 在 `/plugins` 下发布并写进浏览器 boot graph。
 
 删掉那个 insert 行即可，官方选择器立刻回来（客户端插件随 Loader 条目一起卸载）。
 
+## 开发（改代码）
+
+```powershell
+pnpm install            # 一次即可：typescript / esbuild / @types/*
+pnpm typecheck          # src/ 与 tools/ 两份 tsconfig 都过一遍
+pnpm build              # src/ → lib/client.js + lib/index.js（并写 .build-manifest.json）
+node tools/verify.mjs   # 拿真实产物跑离线自检
+```
+
+`lib/` 是**产物**：手改它，下一次构建就没了；只改 `src/` 不构建，自检会直接报
+「产物与源码一致」失败——它按 `lib/.build-manifest.json` 里的 sha256 比对，不看你跑过什么命令。
+构建用「临时文件 + rename」原子替换，所以 HMR 不会读到半截文件（见 AGENTS.md 第 2.3 节）。
+
 ## 自检
 
 ```powershell
@@ -82,10 +98,10 @@ node D:\project\dsh-plugins\dsh-effort-picker\tools\verify.mjs `
 ```
 
 （`--patch` 校验接线行还在不在、路径对不对；`--yaml` 可选，用真实 YAML 解析器校验 patch，
-不传就只做文本校验。不带 `--patch` 时只有第 12 组跳过，其余 13 组照样跑。）
+不传就只做文本校验。不带 `--patch` 时只有第 12 组跳过，其余 14 组照样跑。）
 
 自检是纯 Node、零依赖的离线程序：用 `node:vm` 跑**真实的** `lib/client.js`，喂一个极简 React
-替身与假 ctx，覆盖 14 组共 87 条断言。全部通过时打印 `全部通过 ✓` 并以 0 退出。
+替身与假 ctx，覆盖 15 组共 94 条断言。全部通过时打印 `全部通过 ✓` 并以 0 退出。
 
 ## 出问题时
 
@@ -134,21 +150,36 @@ node D:\project\dsh-plugins\dsh-effort-picker\tools\verify.mjs `
 - **拖动预览只出现在面板里**：面板标题用 `effortLabel`（跟手），面板**外面**的触发器用
   `committedLabel`（已提交档位）。触发器跟着拖动变的话，下方那行会在 Low/Medium/High 之间跳、
   文字宽度也会抖。
+- **源码是 TS、产物是 JS**：投递链路只认 `.js`（浏览器直接当 classic script 执行），所以中间
+  必须有 `pnpm build` 这一步。产物不压缩、带一段说明外壳，出问题时它就是现场；但**事实来源是
+  `src/`**，别去改 `lib/`。
+- **面板定位用 `@floating-ui/dom`**：打开瞬间的位置由纯函数 `estimatePanelPosition()` 同步给出
+  （贴触发器上方、放不下翻到下方、左右不越界——三条都有离线断言），随后由 `autoUpdate` 跟随
+  composer 撑高、窗口缩放、外层滚动容器移动。手写这套监听会漏掉 `ResizeObserver` 那类变化。
+- **打开态的触发器也上底色**：只靠 hover 的话，看不出这个按钮正被按住（面板已经开了）。
 
 ## 目录结构
 
 ```
 dsh-effort-picker/
-  package.json      包清单：exports{"./client"} + dsh.client{platform:"web"}
-  lib/index.js      宿主半边：空的 apply，只作为 Loader 的接线柱
-  lib/client.js     浏览器半边：window.__ModuleLoader__ 懒 CJS bundle（全部 UI）
-  tools/verify.mjs  自检程序（纯 Node，零依赖）
-  AGENTS.md         工程约束：硬规则、不变量、改动流程
+  src/client/        浏览器半边源码（TS/TSX）：platform 平台入口、styles、geometry、
+                     placement、dom、hooks、boundary、row、track、picker、index
+  src/host/index.ts  宿主半边：空的 apply，只作为 Loader 的接线柱
+  tools/build.ts     esbuild 构建：src/ → lib/*.js（产物自带 __ModuleLoader__ 外壳）
+  tools/verify.mjs   自检程序（纯 Node，零依赖）
+  lib/client.js      产物：window.__ModuleLoader__ 懒 CJS bundle（**不要手改**）
+  lib/index.js       产物：宿主半边 ESM
+  lib/.build-manifest.json  产物清单：输入的 sha256，自检用它判断"源码改了没构建"
+  package.json       包清单：exports{"./client"} + dsh.client{platform:"web"}
+  tsconfig.json      src/ 的类型检查（classic JSX：jsxFactory = h）
+  tsconfig.tools.json tools/ 的类型检查（Node 直接跑 .ts，故要求 erasableSyntaxOnly）
+  AGENTS.md          工程约束：硬规则、不变量、改动流程
 ```
 
 运行时**零依赖**：宿主半边不 import 任何东西；浏览器半边只 `require` 平台种子表里的
 `react` / `react-dom` / `@deepseek-ai/dsh-client-ui-primitives`（种子表固化在 shell 里，
-不需要 `dsh.client.external` 声明）。
+不需要 `dsh.client.external` 声明）。第三方包（目前只有 `@floating-ui/dom`，负责面板跟随）
+在构建期被打进产物，运行期不依赖 `node_modules`。
 
 ## 改代码前
 

@@ -8,6 +8,8 @@ build/
 out/
 *.tsbuildinfo
 .cache/
+# 构建脚本的原子替换临时文件（正常不会留下）
+lib/*.tmp-*
 
 # 日志
 *.log

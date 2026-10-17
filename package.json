@@ -2,7 +2,7 @@
   "name": "dsh-effort-picker",
   "version": "0.0.1",
   "private": true,
-  "description": "DSH Web 客户端插件：把 composer 的思考模式（reasoning effort）换成 Codex 风格的渐变滑杆。当前版本是链路验证探针。",
+  "description": "DSH Web 客户端插件：把 composer 的思考模式（reasoning effort）换成 Codex 风格的渐变滑杆。TypeScript 源码 + esbuild 产物。",
   "type": "module",
   "main": "lib/index.js",
   "exports": {
@@ -14,6 +14,20 @@
     "client": {
       "platform": "web"
     }
+  },
+  "scripts": {
+    "build": "node tools/build.ts",
+    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.tools.json",
+    "verify": "node tools/verify.mjs",
+    "check": "npm run typecheck && npm run build && node tools/verify.mjs"
+  },
+  "devDependencies": {
+    "@floating-ui/dom": "^1.8.0",
+    "@types/node": "^24.10.1",
+    "@types/react": "~18.3.1",
+    "@types/react-dom": "~18.3.0",
+    "esbuild": "^0.28.2",
+    "typescript": "~5.9.3"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "~4.0.4"

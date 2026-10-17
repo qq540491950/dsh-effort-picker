@@ -10,16 +10,21 @@ Codex 风格的推理档位面板。
 
 - **自用维护，不发布**。`package.json` 里 `"private": true`；不做 npm 发布、不写发布流程、
   不带版本发布脚本。接线只有一种：DSH profile 里的一个路径行。
-- **零运行时依赖、零构建步骤**。`lib/client.js` 就是直接投递给浏览器的产物，改完即产物。
+- **运行时零依赖、源码是 TypeScript**。`src/**` 是唯一事实来源，`lib/*.js` 由 `tools/build.ts`
+  （esbuild）生成——**改完必须 `npm run build`，永远不要手改 `lib/`**。第三方包只在构建期存在
+  （会被打进产物），运行期仍然只向平台种子表要模块。
 - 仓库里只有 Linux 风格 LF 换行（`.gitattributes` 强制），不要提交 CRLF。
 
 ### 文件职责
 
 | 文件 | 职责 | 改它的风险 |
 |---|---|---|
-| `lib/client.js` | 浏览器半边：全部 UI 与交互，`window.__ModuleLoader__` 懒 CJS bundle | **高**——第 2 节三条硬规则全在这里 |
-| `lib/index.js` | 宿主半边：空的 `apply`，仅作为 Loader 的接线柱 | 低，但**不许删**：删了 `dsh-client-modules` 从该条目向上找不到 `package.json`，客户端 bundle 就不再投递 |
-| `package.json` | 包清单契约（第 4 节） | 中——改错就整体不加载 |
+| `src/client/**` | 浏览器半边源码（TS/TSX）：`index` 插件体与出口、`platform` 平台种子入口、`picker`/`track`/`row`/`boundary` 组件、`styles`、`geometry`、`placement`、`dom`、`hooks` | **高**——第 2 节三条硬规则全在这里 |
+| `src/host/index.ts` | 宿主半边：空的 `apply`，仅作为 Loader 的接线柱 | 低，但**不许删**：删了 `dsh-client-modules` 从该条目向上找不到 `package.json`，客户端 bundle 就不再投递 |
+| `tools/build.ts` | 构建：esbuild 把 `src/` 打成 `lib/client.js`（外套 `__ModuleLoader__` 注册壳）与 `lib/index.js`，原子替换 + 写 `.build-manifest.json` | 高——外壳与 `id` 契约在这里，写错就整体不加载 |
+| `tsconfig.json` / `tsconfig.tools.json` | `src/` 与 `tools/` 的类型检查（classic JSX：`jsxFactory = h`） | 中——配置漂了就查不出类型错 |
+| `package.json` | 包清单契约（第 4 节）+ devDeps + 脚本 | 中——改错就整体不加载 |
+| `lib/client.js` / `lib/index.js` | **产物**，不要手改 | 手改会被下次构建覆盖，且自检第 1 组会报"产物与源码不一致" |
 | `tools/verify.mjs` | 离线自检：纯 Node、无依赖，用 `node:vm` 跑**真实的** `lib/client.js` | 低；改它必须同步改断言，**不许为了让它变绿而放宽断言** |
 | `README.md` | 面向使用者的介绍与使用说明 | 低 |
 | `AGENTS.md` | 本文件（工程约束） | 低 |
@@ -71,7 +76,8 @@ ctx.inject(["slots", "modelDirectories", "sessions", "remote", "remote.session"]
 `dsh-client-hmr` 每 500ms 按 mtime/ctime/size 判版本。文件写到一半时被读到，按失败策略
 「替换失败不回滚」，插件会彻底消失（界面里模型控件没了）。
 
-**写 `lib/client.js` 一定要写临时文件再原子替换**，不要就地截断写入。恢复办法见第 7 节。
+**`tools/build.ts` 已经用「临时文件 + rename」原子替换**——这条纪律现在由构建脚本守着，
+不要改成直接 `writeFile` 覆盖 `lib/client.js`，也不要手写 `lib/`。恢复办法见第 7 节。
 
 ## 3. 不能改的东西（不变量）
 
@@ -81,7 +87,9 @@ ctx.inject(["slots", "modelDirectories", "sessions", "remote", "remote.session"]
 | 座位注册必须留 `priority: -1` | 官方注册在 0，`single` 座位取"priority 最低者渲染"；改回 0 会与官方同 priority **直接报错**，改成 >0 则永远被官方盖住 | verify 第 4 节 |
 | `inject` 工厂只交出 `resolve` 闭包，**不在里面解析** | 2.1 + 2.2 两条规则的交点 | verify 第 4 节 |
 | `SeatBoundary` 必须包住座位子树 | 2.1 | verify 第 4b 节 |
-| `require` 只能取平台种子模块：`react` / `react-dom` / `cordis` / `dsh-client-store` / `ui-slots` / `ui-primitives` / `ui-dockkit`（这是**允许集**；本插件实际只用了 `react` / `react-dom` / `ui-primitives`） | 种子表固化在 shell 里，取别的会 `require` 失败 | 运行期 |
+| `require` 只能取平台种子模块：`react` / `react-dom` / `cordis` / `dsh-client-store` / `ui-slots` / `ui-primitives` / `ui-dockkit`（这是**允许集**；本插件实际只用了 `react` / `react-dom` / `ui-primitives`） | 种子表固化在 shell 里，取别的会 `require` 失败 | verify 第 3 节 |
+| 新增第三方依赖只能是**构建期**的：必须被 esbuild 打进产物 | 浏览器里没有 `node_modules`；把依赖标成 external 等于运行时 `require` 失败 | verify 第 3 节（产物 require 面只允许种子） |
+| `lib/*.js` 是**产物**，禁止手改 | 手改会被下一次构建覆盖；"只看 lib/ 不看 src/" 迟早把修复弄丢 | verify 第 1 组（`.build-manifest.json` 的 sha256 比对） |
 | 宿主半边零 `import`、导出 `apply` | 它只当接线柱；多引入依赖就多一个失败面 | verify 第 2 节 |
 | 文案硬编码中文、**不注册 locale 命名空间** | 有意少一个失败面 | 约定 |
 | 数据面只走官方 `ctx.modelDirectories` 的 `directory.store` / `directory.select()`，写入只作用于**下一次请求** | 与 `/model` 命令看到的状态天然一致 | 约定 |
@@ -93,8 +101,9 @@ ctx.inject(["slots", "modelDirectories", "sessions", "remote", "remote.session"]
 | 触发器里模型名是 `label-secondary`、档位是 `label-caption`（比模型名浅一号，**不是** brand 色）；模型列表每个 provider 是一张圆角卡片（`border-l3` + `var(--dsw-radius-md)` + `color-mix(label-primary 5%, transparent)` 底），组名用 `label-tertiary`（比模型行的 `label-primary` 暗两档） | 文字层级要分得出主次：触发器里"模型名 · 档位"（反馈：档位的字浅一点），列表里"分组名 vs 模型名"（反馈两轮：只调字色"依然不明显"，所以整组框起来）。卡片不能用 `border-l1`（4%/6% 不透明度，框不出来），底色不能裸用 `bg-layer-2`（与半透明菜单面同色）；卡片形态下不做吸顶，否则组名会浮在边框外 | verify 第 6、10 节 |
 | 面板 `width: "224px"` 与轨道 200px 同源 | 轨道不设自身宽度，撑满内容宽 = 面板宽 − 左右各 12px padding；改面板宽等于改轨道宽 | 人工 |
 
-**不要顺手做的重构**：不加依赖、不引入构建/打包工具、不把 `lib/client.js` 拆成多文件（它必须是一个
-classic script，不是 ESM）、不改有意的硬编码、不"美化"间距到与现状不一致（diff 越小越好）。
+**不要顺手做的重构**：不把 `lib/` 当源码改；不给**运行期**加依赖（第三方包只能写进 `src/` 并被
+打包进产物）；不改有意的硬编码；不"美化"间距到与现状不一致。`src/` 允许多文件、允许 JSX、允许
+第三方包——但**产物必须是单文件 classic script**，不能是 ESM，`require` 面不能超出种子表。
 
 ## 4. 包清单契约
 
@@ -111,8 +120,10 @@ bundle → Host 在 `/plugins` 下发布并写进浏览器 boot graph。
 
 ## 5. 改动流程（做完算数才算完）
 
-1. 改代码（`lib/client.js` 用原子替换写）。
-2. **跑自检**：
+1. 改 `src/**`（TS/TSX 源码）。**不要**改 `lib/`。
+2. **类型检查**：`npm run typecheck`（`src/` 与 `tools/` 两份 tsconfig 都要过）。
+3. **构建**：`npm run build`（`src/` → `lib/client.js` + `lib/index.js`，原子替换 + 写清单）。
+4. **跑自检**：
 
    ```powershell
    node tools/verify.mjs
@@ -120,18 +131,20 @@ bundle → Host 在 `/plugins` 下发布并写进浏览器 boot graph。
 
    可选参数：`--patch <cordis.patch.yml 路径>` 校验接线行；再带 `--yaml <yaml 包目录>` 用真实 YAML
    解析器校验（该目录需有 `dist/index.js`）。
-3. **必须看到 `全部通过 ✓` 且退出码 0**。失败时会打印 `失败 N 项：` 并 `exit 1`。
-4. 只有第 3 步过了才有资格说"改好了"。**禁止**在没跑自检、或自检失败的情况下汇报成功；也禁止用
+5. **必须看到 `全部通过 ✓` 且退出码 0**。失败时会打印 `失败 N 项：` 并 `exit 1`。
+6. 只有第 5 步过了才有资格说"改好了"。**禁止**在没跑自检、或自检失败的情况下汇报成功；也禁止用
    "看起来没问题"替代实际输出。
-5. 提交（第 6 节）并推送。
+7. 提交（第 6 节）并推送。
 
-自检覆盖 14 个分组（含 `4b` 降级、`8b` 连续跟手）共 87 条断言：包清单契约、宿主 `apply`、模块协议、
+自检覆盖 15 个分组（含 `4b` 降级、`8b` 连续跟手、`11b` 面板落位）共 94 条断言：包清单契约与
+**构建新鲜度**（`src/` 改了没构建会直接失败，新增文件与纯类型文件也算）、宿主 `apply`、模块协议
+（含"产物只向平台要种子模块"）、
 `priority -1` 注册与注入清单回归护栏、`resolve()` 解析、解析失败时座位内降级（不退役条目、上报控制台、
 排自动重试）、子代理会话短路、触发器文案（含"不放前导图标、紧凑模式保留档位、档位比模型名浅"）、
 滑杆 ARIA、停靠点数量、进度填充与滑块同源、主题适配（轨道掺色 / 圆钮与停靠点带描边）、拖拽只提交一次
 且触发器不跟手跳、键盘调档、模型下钻（含"分组圆角卡片 + 组名暗两档 + role=group"）、失败提示保留面板、
-profile 接线。第 12 节会把 patch 里的路径行与**本机实际路径**比对，所以**仓库一搬家就必须同步改 profile
-里的路径行**（forward slash 形式）。
+面板落位（上方优先 / 放不下翻转 / 左右不越界）、profile 接线。第 12 节会把 patch 里的路径行与
+**本机实际路径**比对，所以**仓库一搬家就必须同步改 profile 里的路径行**（forward slash 形式）。
 
 ## 6. 提交与推送
 
@@ -145,7 +158,7 @@ profile 接线。第 12 节会把 patch 里的路径行与**本机实际路径**
 
 | 症状 | 原因 | 恢复 |
 |---|---|---|
-| 界面里模型控件整个没了 | 条目被退役（2.1 / 2.3） | 重新保存一次 `lib/client.js`（内容不变也行，mtime/size 变了宿主就会发新 rev；用临时文件 + 原子替换更稳），或 `Ctrl+R` 刷新页面。不必重启 DSH |
+| 界面里模型控件整个没了 | 条目被退役（2.1 / 2.3） | 重新 `npm run build`（内容不变也行，mtime/size 变了宿主就会发新 rev），或 `Ctrl+R` 刷新页面。不必重启 DSH |
 | 想看到失败原因 | — | 读 `localStorage["dsh-effort-picker:last-failure"]`，或看控制台 `[dsh-effort-picker]` 前缀（只有第一条） |
 | 想立刻回到官方控件 | — | 删掉 profile 里 `id: dsh-effort-picker` 那个 insert 行，官方选择器立刻回来 |
 
@@ -160,5 +173,6 @@ profile 是**用户的环境**，不是本仓库的一部分：`C:\Users\admin\.
 
 - 仓库路径：`D:\project\dsh-plugins\dsh-effort-picker`（profile 里的路径行依赖它）。
 - profile 补丁：`C:\Users\admin\.dsh\profiles\desktop\cordis.patch.yml`。
-- Node：v24.14.1（自检只需标准库）。
+- Node：v24.15.0（`tools/build.ts` 靠 Node 原生类型剥离直接跑 `.ts`，所以构建脚本只能写可擦除语法——
+  `tsconfig.tools.json` 的 `erasableSyntaxOnly` 守着这条）；pnpm 12.14.0；TypeScript 5.9.3；esbuild 0.28.2。
 - 目标座位：`conversation.input.model`；被遮蔽的官方插件：`@deepseek-ai/dsh-client-ui-model-selection`。
