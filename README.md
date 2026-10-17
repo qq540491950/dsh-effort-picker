@@ -144,8 +144,8 @@ node D:\project\dsh-plugins\dsh-effort-picker\tools\verify.ts `
 都算通过；`--yaml` 可选，用真实 YAML 解析器校验该 patch 能解析。不带 `--patch` 时只有第 12b 组跳过。）
 
 自检是纯 Node、零依赖的离线程序（本身也是 TS，靠 Node 原生类型剥离直接跑）：用 `node:vm` 跑
-**真实的** `lib/client.js`，喂一个极简 React 替身与假 ctx，覆盖 16 组共 107 条断言（带 `--patch` 时
-109 条）。全部通过时打印 `全部通过 ✓` 并以 0 退出。
+**真实的** `lib/client.js`，喂一个极简 React 替身与假 ctx，覆盖 16 组共 111 条断言（带 `--patch` 时
+113 条）。全部通过时打印 `全部通过 ✓` 并以 0 退出。
 
 ## 出问题时
 

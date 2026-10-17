@@ -690,6 +690,31 @@ check('滑块落在中间档位（ratio 0.5）', /0\.5\)$/.test(thumb.props.styl
 // 进度填充是轨道里的第一个子节点（铺在停靠点与滑块下面）。
 const fill = track.children[0];
 check('进度填充铺到当前档位（ratio 0.5）', /0\.5\)$/.test(fill.props.style.width), String(fill.props.style.width));
+// 形状：轨道与填充都必须是**胶囊**（半径取到半高，左右两端都是半圆），滑块必须是**正圆**。
+// 这三条是参考图的硬性形状语言，被单独拎出来断言——历史上就出现过"轨道看着像圆角矩形"的返工。
+check(
+	'轨道两端是半圆（胶囊：borderRadius 999px，且高度 22px 的半径封顶在 11px）',
+	track.props.style.borderRadius === '999px',
+	String(track.props.style.borderRadius),
+);
+check(
+	'进度填充两端也是半圆（否则右端会在滑块下面露出直边）',
+	fill.props.style.borderRadius === '999px',
+	String(fill.props.style.borderRadius),
+);
+check(
+	'滑块是正圆（宽高相等 + borderRadius 50%）',
+	thumb.props.style.width === '25px' &&
+		thumb.props.style.height === '25px' &&
+		thumb.props.style.borderRadius === '50%',
+	`${String(thumb.props.style.width)}/${String(thumb.props.style.height)}/${String(thumb.props.style.borderRadius)}`,
+);
+const trackHeightPx = Number(String(track.props.style.height).replace('px', ''));
+check(
+	'轨道 22px < 滑块直径 25px（圆钮略微探出轨道上下沿）',
+	trackHeightPx === 22 && trackHeightPx < Number(String(thumb.props.style.width).replace('px', '')),
+	String(track.props.style.height),
+);
 // 标题区改成"档位名居中 + 模型名居中带 ›"（参考 Codex 的档位面板），
 // 原来左侧的"推理等级"说明行与面板底部那一行模型已合并到这里。
 const headerTitle = findAll(
