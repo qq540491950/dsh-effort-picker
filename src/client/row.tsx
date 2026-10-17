@@ -15,6 +15,11 @@ export interface RowProps {
 	checked?: boolean;
 	disabled?: boolean;
 	title?: string;
+	/**
+	 * 读屏用的整句标签。列表改成平铺后没有 provider 组名了，分组信息就靠它带上
+	 * （同名的模型来自不同 provider 时，这一句是唯一能分辨的地方）。
+	 */
+	ariaLabel?: string;
 	onClick?: () => void;
 	children?: ReactNode;
 }
@@ -23,6 +28,7 @@ export interface RowProps {
 export function Row(props: RowProps) {
 	const [hovered, hoverHandlers] = useHover();
 	const style: CSSProperties = { ...styles.rowButton };
+	if (props.checked === true) Object.assign(style, styles.rowActive);
 	if (hovered && props.disabled !== true) Object.assign(style, styles.rowHover);
 	if (props.disabled === true) Object.assign(style, styles.rowDisabled);
 	return (
@@ -30,6 +36,7 @@ export function Row(props: RowProps) {
 			type="button"
 			role={props.role}
 			aria-checked={props.checked}
+			aria-label={props.ariaLabel}
 			title={props.title}
 			style={style}
 			disabled={props.disabled === true}

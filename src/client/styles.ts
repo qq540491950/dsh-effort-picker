@@ -18,7 +18,7 @@ export const styles = {
 	trigger: {
 		display: 'flex',
 		alignItems: 'center',
-		gap: '4px',
+		gap: '6px',
 		minWidth: 0,
 		maxWidth: 'min(360px, 45cqw)',
 		height: '28px',
@@ -32,6 +32,8 @@ export const styles = {
 		fontWeight: 400,
 		lineHeight: '20px',
 		cursor: 'pointer',
+		// 悬停/按下是同一套底色，补一个过渡，避免鼠标扫过时整块闪。
+		transition: 'background .12s ease, color .12s ease',
 	},
 	/** hover 与"面板已打开"共用（打开态也有底色，否则看不出它被按住了）。 */
 	triggerHover: { background: 'var(--dsw-alias-bg-layer-2)' },
@@ -65,7 +67,7 @@ export const styles = {
 		zIndex: 1100,
 		display: 'flex',
 		flexDirection: 'column',
-		gap: '10px',
+		gap: '12px',
 		// 面板宽度：滑轨宽度 = 面板宽 - 左右各 12px padding。
 		// 264px → 224px 后滑轨为 200px（更紧凑，代价是模型名可显示的字符数变少）。
 		width: '224px',
@@ -76,6 +78,7 @@ export const styles = {
 	},
 	// 标题区（居中，参考 Codex 的档位面板）：当前档位在上，模型名在下。
 	header: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', maxWidth: '100%' },
+	// 档位名是面板的主角：比模型名大一号、加一点字重，但它只负责"读"，不抢滑杆的戏。
 	headerTitle: {
 		maxWidth: '100%',
 		overflow: 'hidden',
@@ -83,8 +86,9 @@ export const styles = {
 		textOverflow: 'ellipsis',
 		textAlign: 'center',
 		color: 'var(--dsw-alias-brand-primary)',
-		fontSize: '14px',
-		fontWeight: 500,
+		fontSize: '15px',
+		fontWeight: 600,
+		letterSpacing: '0.01em',
 		lineHeight: '20px',
 	},
 	// 模型名那一行：居中 + › 的下钻入口。hover 只改文字色，不做背景块（参考图里它就是一行普通文字）。
@@ -106,34 +110,13 @@ export const styles = {
 	headerModelHover: { color: 'var(--dsw-alias-label-primary)' },
 	headerModelText: { minWidth: 0, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' },
 	caption: { color: 'var(--dsw-alias-label-secondary)', fontSize: '12px' },
-	// provider 分组：每个 provider 一张圆角卡片把整组框起来——只靠字色/字号分层，
-	// 反馈里仍然"不明显"。底色按 label-primary 掺 5%（不能裸用 bg-layer-2：
-	// 它和半透明菜单面几乎同色，卡片会消失），边框用 border-l3
-	// （l1 只有 4%~6% 不透明度、框不出来；l2 是 10%/12%，l3 是 12%/16%）。
-	group: {
-		display: 'flex',
-		flexDirection: 'column',
-		gap: '2px',
-		padding: '4px',
-		border: '1px solid var(--dsw-alias-border-l3)',
-		borderRadius: 'var(--dsw-radius-md)',
-		background: 'color-mix(in srgb, var(--dsw-alias-label-primary) 5%, transparent)',
-	},
-	// 组名：label-tertiary（浅色 #81858c / 深色 #adb2b8，比模型行的 label-primary
-	// 暗两档，官方 MenuGroup 就是这个取值）+ 11px/500 + 字距，读起来是"标签"。
-	groupHeading: {
-		padding: '2px 6px 4px',
-		color: 'var(--dsw-alias-label-tertiary)',
-		fontSize: '11px',
-		fontWeight: 500,
-		letterSpacing: '0.05em',
-	},
 	effortName: { color: 'var(--dsw-alias-brand-primary)', fontSize: '13px', fontWeight: 500 },
 	track: {
 		position: 'relative',
-		// 轨道高度与 THUMB_SIZE 是同一套比例：白色圆钮（25px）刻意比轨道（22px）大一点，
-		// 会从轨道上下各探出约 1.5px——参考图里的圆钮就是这么"坐"在轨道上的。
-		height: '22px',
+		// 轨道高度与 THUMB_SIZE 是同一套比例：白圆钮（25px）刻意比轨道（18px）大得多，
+		// 上下各探出约 3.5px——参考图（Codex 的档位面板）里圆钮就是这么"骑"在细轨上的。
+		// 改这里就要同步看 THUMB_SIZE（见 AGENTS.md 第 3 节）。
+		height: '18px',
 		borderRadius: '999px',
 		// 轨道底色不能直接用 bg-layer-2：菜单面是半透明材质（深色主题 #43454a73、
 		// 浅色主题 #f8f9fa94），换算出来的面板色跟 bg-layer-2 几乎一样（浅色主题里
@@ -154,7 +137,12 @@ export const styles = {
 		bottom: 0,
 		left: 0,
 		borderRadius: '999px',
-		background: 'var(--dsw-alias-brand-primary)',
+		// 左端淡入、右端饱和：一段渐变就够，不用引入第二支颜色，
+		// 两种主题下都只依赖 brand-primary，跟着主题走。
+		background:
+			'linear-gradient(90deg, color-mix(in srgb, var(--dsw-alias-brand-primary) 55%, transparent) 0%, var(--dsw-alias-brand-primary) 62%)',
+		// 顶部一条极淡的高光，让填充看起来是"鼓"的，而不是一张色纸。
+		boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, .22)',
 		pointerEvents: 'none',
 	},
 	tick: {
@@ -164,10 +152,10 @@ export const styles = {
 		height: '4px',
 		transform: 'translate(-50%, -50%)',
 		borderRadius: '50%',
-		// 半透明白点 + 一圈极淡的黑描边：白点在深色轨道/品牌色填充上都看得见；
-		// 浅色主题里轨道与填充一个接近白、一个接近黑，就靠描边把点勾出来。
-		background: 'rgba(255, 255, 255, .30)',
-		boxShadow: '0 0 0 1px rgba(0, 0, 0, .18)',
+		// 停靠点要同时活在两种底上：深色轨道上靠白点，品牌填充上靠那圈黑描边。
+		// 原来只有 30% 白 + 6% 描边，落在浅色填充上几乎看不见（截图里就是这样）。
+		background: 'rgba(255, 255, 255, .55)',
+		boxShadow: '0 0 0 1px rgba(0, 0, 0, .28), 0 1px 2px rgba(0, 0, 0, .22)',
 		pointerEvents: 'none',
 	},
 	thumb: {
@@ -179,17 +167,26 @@ export const styles = {
 		borderRadius: '50%',
 		background: '#fff',
 		// 白圆钮在深色主题里本来就分得开；浅色主题里轨道是浅灰、面板接近白，
-		// 只留纯白的话圆钮边界会消失。一圈极淡描边 + 一层投影把边界勾出来——
-		// 参考图里没有这两样，但那是在深色主题下截的。
-		boxShadow: '0 0 0 1px rgba(0, 0, 0, .10), 0 1px 4px rgba(0, 0, 0, .35)',
+		// 只留纯白的话圆钮边界会消失。所以：极淡描边（切边）+ 一圈品牌色光晕
+		// （把它和填充"焊"在一起，圆钮不再像一颗浮在上面的白球）+ 落影（立体感）。
+		boxShadow:
+			'0 0 0 1px rgba(0, 0, 0, .08), 0 0 0 4px color-mix(in srgb, var(--dsw-alias-brand-primary) 16%, transparent), 0 2px 8px rgba(0, 0, 0, .45)',
 		pointerEvents: 'none',
 	},
+	/** 拖动中的圆钮：放大一点点、光晕更亮（`track.tsx` 按 `dragging` 切）。 */
+	thumbActive: {
+		boxShadow:
+			'0 0 0 1px rgba(0, 0, 0, .08), 0 0 0 6px color-mix(in srgb, var(--dsw-alias-brand-primary) 22%, transparent), 0 3px 12px rgba(0, 0, 0, .5)',
+	},
+	// 列表是 Codex 式的**平铺**（没有分组卡片，也没有组名）：分组信息退到每行的
+	// `aria-label` 里，视觉上只留"模型名 + 档位 + 勾"。之前那版 provider 卡片是为
+	// "分组名与模型名分不出来"加的，后来明确要求向 Codex 看齐，于是撤掉。
 	rowButton: {
 		display: 'flex',
 		alignItems: 'center',
 		gap: '8px',
 		width: '100%',
-		padding: '6px 8px',
+		padding: '7px 8px',
 		border: 'none',
 		borderRadius: '6px',
 		background: 'transparent',
@@ -197,13 +194,18 @@ export const styles = {
 		font: 'inherit',
 		textAlign: 'left',
 		cursor: 'pointer',
+		transition: 'background .1s ease',
 	},
-	rowHover: { background: 'var(--dsw-alias-bg-layer-2)' },
+	// 半透明菜单面上不要用 bg-layer-2（和面板几乎同色，看不出 hover）。
+	rowHover: { background: 'color-mix(in srgb, var(--dsw-alias-label-primary) 7%, transparent)' },
+	/** 当前选中行：比 hover 再深一点，像 Codex 那样一眼看出"我在这"。 */
+	rowActive: { background: 'color-mix(in srgb, var(--dsw-alias-label-primary) 11%, transparent)' },
 	rowDisabled: { opacity: 0.5, cursor: 'default' },
 	list: {
 		display: 'flex',
 		flexDirection: 'column',
-		gap: '6px',
+		// 平铺列表（没有卡片）行距要小，行本身承担 hover/选中高亮。
+		gap: '2px',
 		maxHeight: 'min(320px, 50vh)',
 		overflowY: 'auto',
 		// 列表滚动时不把滚动传给下面的对话列表；滚动条出现/消失时也不让面板宽度跳一格。
@@ -211,7 +213,8 @@ export const styles = {
 		scrollbarGutter: 'stable',
 	},
 	modelName: { flex: 1, minWidth: 0, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' },
-	slot: { width: '16px', flex: 'none', display: 'inline-flex', alignItems: 'center' },
+	/** 行尾那一格：勾选图标，没有勾选时留同样宽的空格，保证模型名左对齐。 */
+	slot: { width: '18px', flex: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'flex-end' },
 	notice: { color: 'var(--dsw-alias-label-secondary)', fontSize: '12px', padding: '4px 2px' },
 	error: { color: 'var(--dsw-alias-state-error-primary)', fontSize: '12px', padding: '4px 2px' },
 	// 座位内部兜住错误时替换触发器的那一行提示（点击可重试）。

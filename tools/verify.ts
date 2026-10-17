@@ -885,31 +885,28 @@ modelTree = modelSeat.render();
 const modelRows = findByRole(modelTree, 'menuitemradio');
 check('模型列表渲染出 3 个模型', modelRows.length === 3, String(modelRows.length));
 check('当前模型被标记为选中', modelRows[0].props.checked === true, String(modelRows[0].props.checked));
-check('模型列表按 provider 分组显示标题', textOf(modelTree).includes('cpa'), textOf(modelTree));
-// 分组必须和模型名分得开（反馈两轮：先"分不出来"，再"依然不明显"）：
-//   · 每个 provider 一张圆角卡片：border-l3 边框 + border-radius + label-primary 掺 5% 的底色；
-//   · 组名用 label-tertiary，比模型行的 label-primary 暗两档（官方 MenuGroup 的取值）；
-//   · 分组容器是 role=group 并由标题命名（读屏不会把组名跟模型名连读）。
-const groupBox = findAll(modelTree, (node) => node.props?.role === 'group')[0];
-// 组名是卡片里唯一自带 color 的节点（模型行是 Row 组件元素，style 在组件内部算）。
-const groupHeading = groupBox === undefined ? undefined : findAll(groupBox, (node) => node.props?.style?.color !== undefined)[0];
+// 列表是 Codex 式**平铺**：没有分组卡片、也没有组名（按要求向 Codex 看齐，撤掉了
+// 早先那版 provider 圆角卡片）。分组信息改由每行的 aria-label 带着——同名模型来自
+// 不同 provider 时，读屏仍然分得清，这是"去掉视觉组名"的替代，不是丢失。
 check(
-	'分组容器是 role=group 且由标题命名',
-	groupBox !== undefined && String(groupBox.props['aria-label']).length > 0,
-	String(groupBox?.props['aria-label']),
+	'平铺列表：没有分组卡片',
+	findAll(modelTree, (node) => node.props?.role === 'group').length === 0,
+	String(findAll(modelTree, (node) => node.props?.role === 'group').length),
 );
-// 模型行的文字色也来自 bundle 源码里的 rowButton。
+const rowLabels = modelRows.map((row) => String(row.props.ariaLabel));
+check(
+	'每行的 aria-label 带上 provider（同名模型也能分清）',
+	rowLabels.every((label) => label.includes('cpa')),
+	rowLabels.join(' | '),
+);
+// 模型行主文字仍是 label-primary（来自 bundle 源码里的 rowButton）。
 const rowButtonColor = /rowButton:\s*\{[\s\S]*?color:\s*"([^"]+)"/.exec(clientSource)?.[1] ?? '';
-check(
-	'分组是圆角卡片（border-l3 + 圆角 + 掺色底），组名比模型名暗两档',
-	String(groupHeading?.props.style.color).includes('label-tertiary') &&
-		!String(groupHeading?.props.style.color).includes('label-secondary') &&
-		String(groupBox?.props.style.border).includes('border-l3') &&
-		String(groupBox?.props.style.borderRadius).includes('radius') &&
-		String(groupBox?.props.style.background).includes('color-mix') &&
-		rowButtonColor.includes('label-primary'),
-	`heading=${String(groupHeading?.props.style.color)} group=${String(groupBox?.props.style.border)}/${String(groupBox?.props.style.borderRadius)} row=${rowButtonColor}`,
-);
+check('模型行文字用 label-primary', rowButtonColor.includes('label-primary'), rowButtonColor);
+// 选中标记在行尾：当前行有勾，其它行没有（平铺后它是唯一的"我在哪"信号）。
+const checkIconCount = (row: FakeElement): number =>
+	findAll(row, (node) => node.type === primitivesStub.IconCheckOutlineRegular).length;
+check('当前行行尾有勾选图标', checkIconCount(modelRows[0]) === 1, String(checkIconCount(modelRows[0])));
+check('非当前行没有勾选图标', checkIconCount(modelRows[1]) === 0, String(checkIconCount(modelRows[1])));
 check('当前模型行显示当前档位 Medium', textOf(modelRows[0]).includes('Medium'), textOf(modelRows[0]));
 // 非当前模型行显示的是"选中它会带上的那一档" = 该模型的**最高档**。
 // glm-5.3 的路由默认档是 low，但最高档是 High —— 行里必须显示 High（旧实现显示路由默认的 Low）。

@@ -424,54 +424,43 @@ function CodexEffortPickerSeat(props: SeatProps) {
 									<primitives.IconChevronLeftOutlineRegular size={14} style={styles.chevron} />
 									<span style={styles.caption}>返回</span>
 								</Row>
-								{state.groups
-									.filter((group) => group.models.length > 0)
-									.map((group) => (
-										<div key={group.id} style={styles.group} role="group" aria-label={group.name ?? group.id}>
-											{/* provider 分组标题：官方也是按 provider 分组的 */}
-											<div style={styles.groupHeading} aria-hidden="true">
-												{group.name ?? group.id}
-											</div>
-											{group.models.map((model) => {
-												const isCurrent =
-													current?.provider === group.id && current?.model === model.id;
-												const levels = model.reasoning?.efforts ?? [];
-												// 当前模型显示会话正在用的档位；其它模型显示**选中它会带上的那一档**
-												// （= 该模型的最高档，见 chooseModel）。
-												//
-												// 原来这里显示路由默认档（`model.reasoning.defaultEffort`），
-												// 而路由默认档是"一条路由一个值"：huawei 设成 high 之后每个模型
-												// 都显示 High，看不出谁支持 max（实测反馈：「huawei 都是 high」）。
-												const appliedEffort =
-													levels.length > 0 ? levels[levels.length - 1].id : undefined;
-												const effortId = isCurrent
-													? (current?.reasoningEffort ??
-														model.reasoning?.defaultEffort ??
-														appliedEffort)
-													: appliedEffort;
-												const effortName =
-													levels.find((level) => level.id === effortId)?.name ?? effortId;
-												return (
-													<Row
-														key={`${group.id}/${model.id}`}
-														role="menuitemradio"
-														checked={isCurrent}
-														disabled={lockedNow}
-														title={levels.length === 0 ? undefined : `${String(levels.length)} 档可选`}
-														onClick={() => chooseModel(group, model)}
-													>
-														<span style={styles.slot}>
-															{isCurrent ? <primitives.IconCheckOutlineRegular size={14} /> : null}
-														</span>
-														<span style={styles.modelName}>{model.name ?? model.id}</span>
-														{effortName === undefined ? null : (
-															<span style={isCurrent ? styles.effortName : styles.caption}>{effortName}</span>
-														)}
-													</Row>
-												);
-											})}
-										</div>
-									))}
+								{state.groups.flatMap((group) =>
+									group.models.map((model) => {
+										const isCurrent = current?.provider === group.id && current?.model === model.id;
+										const levels = model.reasoning?.efforts ?? [];
+										// 当前模型显示会话正在用的档位；其它模型显示**选中它会带上的那一档**
+										// （= 该模型的最高档，见 chooseModel）。
+										//
+										// 原来这里显示路由默认档（`model.reasoning.defaultEffort`），
+										// 而路由默认档是"一条路由一个值"：huawei 设成 high 之后每个模型
+										// 都显示 High，看不出谁支持 max（实测反馈：「huawei 都是 high」）。
+										const appliedEffort = levels.length > 0 ? levels[levels.length - 1].id : undefined;
+										const effortId = isCurrent
+											? (current?.reasoningEffort ?? model.reasoning?.defaultEffort ?? appliedEffort)
+											: appliedEffort;
+										const effortName = levels.find((level) => level.id === effortId)?.name ?? effortId;
+										return (
+											<Row
+												key={`${group.id}/${model.id}`}
+												role="menuitemradio"
+												checked={isCurrent}
+												disabled={lockedNow}
+												// 平铺后没有组名了：provider 放进读屏标签，视觉上不占位置。
+												ariaLabel={`${model.name ?? model.id}，${group.name ?? group.id}`}
+												title={levels.length === 0 ? undefined : `${String(levels.length)} 档可选`}
+												onClick={() => chooseModel(group, model)}
+											>
+												<span style={styles.modelName}>{model.name ?? model.id}</span>
+												{effortName === undefined ? null : (
+													<span style={isCurrent ? styles.effortName : styles.caption}>{effortName}</span>
+												)}
+												<span style={styles.slot}>
+													{isCurrent ? <primitives.IconCheckOutlineRegular size={14} /> : null}
+												</span>
+											</Row>
+										);
+									}),
+								)}
 							</div>
 						) : null}
 

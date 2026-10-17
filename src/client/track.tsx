@@ -45,8 +45,13 @@ export function EffortTrack(props: EffortTrackProps) {
 				ref={props.thumbRef}
 				style={{
 					...styles.thumb,
+					...(props.dragging ? styles.thumbActive : {}),
 					left: centerAt(props.shownRatio),
-					transition: props.dragging ? 'none' : 'left .12s ease-out',
+					// 拖动时 left 由 pointermove 直接写（要的是零延迟），所以过渡只留给"放大"这一下。
+					transform: `translate(-50%, -50%) scale(${props.dragging ? '1.06' : '1'})`,
+					transition: props.dragging
+						? 'transform .12s ease-out'
+						: 'left .12s ease-out, transform .12s ease-out',
 				}}
 			/>
 		);

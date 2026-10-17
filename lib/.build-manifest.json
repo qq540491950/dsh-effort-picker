@@ -1,23 +1,23 @@
 {
   "name": "dsh-effort-picker",
   "tool": "esbuild@0.28.2",
-  "sourceTree": "9f184814e714fb638aa45a15e09d13ac84434aad402fb10a6d84b896b5ec7a68",
+  "sourceTree": "fa4d6c1367c0620a5ee312eaec25d831ad5442344f69644cadbf7085d0dacbe2",
   "targets": [
     {
       "output": "lib/client.js",
-      "outputSha256": "79bbdb258cfe16eb54a033e09afc18cff1a2329c521013b5f26413e25152a2fc",
+      "outputSha256": "f80eb4a362ff0ecbb52f6e61a5b203bb5fd4e0bbea304c6f99029abbc0c78920",
       "inputs": {
         "src/client/boundary.tsx": "d9b8056065bc8f54ff198d840ce84c2936fef60eacd5e2d007d1285cea07e880",
         "src/client/dom.ts": "0707cc0378817268683dd819c6a6ed1449946ae1b26c4a920265499811df3c13",
         "src/client/geometry.ts": "1bd26685e5db5aaa344e2fadcccad09912b5938809daa60532876a8bf2fe8682",
         "src/client/hooks.ts": "83cccb2a6be3f7d472c6d8a5ce37b81309029df1ec2017fdf67529bc8a831177",
         "src/client/index.ts": "2c1ab94236b143f7e885755acd8360ee56841e3a40e7332b6e2f367047d0e4b8",
-        "src/client/picker.tsx": "182d43629adf35e5e9800fe757669ff4d39d169d638bd35884a59f103aa7da0f",
+        "src/client/picker.tsx": "3359e2bf49cc202d2ca12e1c9bea63472537889dcd5bf875f16f690d1cfc47b9",
         "src/client/placement.ts": "e7b5a7ed7e9153db1a694276b868d648e2e853157597d5b2f9ae336cfc4a58d4",
         "src/client/platform.ts": "389db0269532b9e8329031238c9c547584da169bce4c3838632834a0e15431a0",
-        "src/client/row.tsx": "7179396366b9eab8b9989b9a59f960f5d6caf5f81987fc9e2e9761db3a9ab085",
-        "src/client/styles.ts": "058aadcdaa25652670713f9cee831fc03570a27d277c0bcd12ff0b3500536a56",
-        "src/client/track.tsx": "7ee3ca8187bb80dde2d2671f857793f1fa585eef0d5004000ddd2e8aa5b6da49"
+        "src/client/row.tsx": "edb6460e6ecd2f69d46659b46221040fb407d6ec3de4eaa5401f5566fe26dbf5",
+        "src/client/styles.ts": "0b16a78286df46f6fcae8822a6524751616c55c8a2a8709e148ceb1f2173e829",
+        "src/client/track.tsx": "4a75b2abd8addf87eaebc9046a33df9345d11fc516e28bcefd0e20970647fe2a"
       }
     },
     {
