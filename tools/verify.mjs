@@ -230,7 +230,12 @@ const GROUPS = [
 				name: 'deepseek-v4.1-flash',
 				reasoning: { efforts: EFFORT_LEVELS, defaultEffort: 'max' },
 			},
-			{ id: 'cn:glm-5.3', name: 'glm-5.3', reasoning: { efforts: EFFORT_LEVELS.slice(1, 4), defaultEffort: 'high' } },
+			// 路由默认档（`defaultEffort`）**故意不等于最高档**：切过去必须落在最高档 High，
+			// 而不是路由默认的 low —— 这是"huawei 都是 high"那次实测反馈的回归护栏。
+			{ id: 'cn:glm-5.3', name: 'glm-5.3', reasoning: { efforts: EFFORT_LEVELS.slice(1, 4), defaultEffort: 'low' } },
+			// **没有** defaultEffort（真实例子里 tengxun 那条路由就没有路由默认档）：
+			// 切过去仍必须带上最高档，绝不能"不带档位"——那会把会话档位清空，滑块随即没有滑块头。
+			{ id: 'cn:glm-5.3-flash', name: 'glm-5.3-flash', reasoning: { efforts: EFFORT_LEVELS.slice(1, 5) } },
 		],
 	},
 ];
@@ -723,6 +728,48 @@ check(
 );
 //#endregion
 
+//#region 8c. 档位没设置时滑块也必须有滑块头
+section('8c) 未显式设置档位');
+// 会话档位被清空（官方 `/model` 切换、或历史上被不带档位的选择清过）+ 该模型**没有**路由默认档
+// → 旧实现 `activeIndex = -1` → thumb / fill 都不渲染，用户看到一条没有滑块头的轨道。
+const unsetSnapshot = {
+	...SNAPSHOT,
+	current: { provider: 'cpa', model: 'cn:glm-5.3-flash' },
+};
+const unsetHarness = createHarness({ snapshot: unsetSnapshot });
+clientExports.apply(unsetHarness.ctx);
+const unsetSeat = mountSeat(unsetHarness);
+const unsetTrigger = findAll(unsetSeat.tree, (node) => node.props?.['aria-haspopup'] === 'dialog')[0];
+check(
+	'未显式设置档位时触发器显示「最高档（默认）」而不是「默认」',
+	textOf(unsetTrigger).includes('Max（默认）'),
+	textOf(unsetTrigger),
+);
+unsetTrigger.props.onClick();
+const unsetTree = unsetSeat.render();
+const unsetTrackNode = findTrack(unsetTree);
+check('未显式设置档位时轨道仍然渲染', unsetTrackNode !== undefined);
+// 断言不许在缺节点时抛 TypeError：那样整份自检会**崩掉**，后面的用例一条都跑不到
+// （旧实现里 thumb/fill 都是 null，第一版就是这么崩掉的）。
+const unsetTrack = unsetTrackNode === undefined ? undefined : unsetTrackNode.type(unsetTrackNode.props);
+const unsetThumb = unsetTrack === undefined ? undefined : unsetTrack.children.at(-1);
+const unsetFill = unsetTrack === undefined ? undefined : unsetTrack.children[0];
+const hasThumb = unsetThumb !== null && unsetThumb !== undefined;
+check('轨道上仍有滑块头（旧实现这里是 null → 看起来就是"滑块不行"）', hasThumb, String(unsetThumb));
+check(
+	'滑块头落在最高档（ratio 1）',
+	hasThumb && /1\)$/.test(unsetThumb.props.style.left),
+	String(unsetThumb?.props.style.left),
+);
+check(
+	'进度填充同样铺到最高档（不会与滑块头错位）',
+	hasThumb && unsetFill !== null && unsetFill !== undefined && unsetFill.props.style.width === unsetThumb.props.style.left,
+	`fill=${String(unsetFill?.props.style.width)} thumb=${String(unsetThumb?.props.style.left)}`,
+);
+// 面板标题同样带「默认」后缀，不把兜底位置说成用户选过的档位。
+check('面板标题显示「Max（默认）」', textOf(unsetTree).includes('Max（默认）'), textOf(unsetTree));
+//#endregion
+
 //#region 9. 键盘调档
 section('9) 键盘调档');
 const keyHarness = createHarness();
@@ -759,7 +806,7 @@ check('该入口显示当前模型', textOf(modelLine).includes('deepseek-v4.1-f
 modelLine.props.onClick();
 modelTree = modelSeat.render();
 const modelRows = findByRole(modelTree, 'menuitemradio');
-check('模型列表渲染出 2 个模型', modelRows.length === 2, String(modelRows.length));
+check('模型列表渲染出 3 个模型', modelRows.length === 3, String(modelRows.length));
 check('当前模型被标记为选中', modelRows[0].props.checked === true, String(modelRows[0].props.checked));
 check('模型列表按 provider 分组显示标题', textOf(modelTree).includes('cpa'), textOf(modelTree));
 // 分组必须和模型名分得开（反馈两轮：先"分不出来"，再"依然不明显"）：
@@ -787,15 +834,30 @@ check(
 	`heading=${String(groupHeading?.props.style.color)} group=${String(groupBox?.props.style.border)}/${String(groupBox?.props.style.borderRadius)} row=${rowButtonColor}`,
 );
 check('当前模型行显示当前档位 Medium', textOf(modelRows[0]).includes('Medium'), textOf(modelRows[0]));
-check('其它模型行显示其默认档位 High', textOf(modelRows[1]).includes('High'), textOf(modelRows[1]));
+// 非当前模型行显示的是"选中它会带上的那一档" = 该模型的**最高档**。
+// glm-5.3 的路由默认档是 low，但最高档是 High —— 行里必须显示 High（旧实现显示路由默认的 Low）。
+check(
+	'其它模型行显示选中它会带上的档位（最高档 High，不是路由默认的 Low）',
+	textOf(modelRows[1]).includes('High') && !textOf(modelRows[1]).includes('Low'),
+	textOf(modelRows[1]),
+);
 modelRows[1].props.onClick();
 check('选模型提交 provider', modelHarness.calls.select[0]?.provider === 'cpa', JSON.stringify(modelHarness.calls.select[0]));
 check('选模型提交该模型 id', modelHarness.calls.select[0]?.model === 'cn:glm-5.3', JSON.stringify(modelHarness.calls.select[0]));
 check(
-	'选模型带上该模型默认档位（high）',
+	'选模型带上该模型的最高档（high），不是路由默认档（low）',
 	modelHarness.calls.select[0]?.reasoningEffort === 'high',
 	JSON.stringify(modelHarness.calls.select[0]),
 );
+// 回归护栏：模型**没有** defaultEffort 时也必须显式带上最高档。
+// 旧实现这里会省略 reasoningEffort → 会话档位被清空 → 选择器没有滑块头（实测反馈的根因）。
+modelRows[2].props.onClick();
+check(
+	'没有路由默认档的模型也要带上最高档（max），绝不能省略档位',
+	modelHarness.calls.select[1]?.reasoningEffort === 'max',
+	JSON.stringify(modelHarness.calls.select[1]),
+);
+check('并且确实提交了 model id', modelHarness.calls.select[1]?.model === 'cn:glm-5.3-flash', JSON.stringify(modelHarness.calls.select[1]));
 //#endregion
 
 //#region 11. 失败提示
