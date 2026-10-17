@@ -74,7 +74,9 @@ export interface ClientScope {
 	sessions: SessionsService;
 }
 
-/** 客户端根上下文：这里只用到 inject。 */
+/** 客户端根上下文：这里只用到 inject 与 effect（effect 用来挂形状兜底样式表）。 */
 export interface ClientContext {
 	inject(services: string[], callback: (scope: ClientScope) => void): unknown;
+	/** Cordis 的副作用登记：回调返回 disposer，插件卸载/热替换时调用。 */
+	effect(callback: () => () => void): unknown;
 }

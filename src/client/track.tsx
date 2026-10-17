@@ -35,7 +35,13 @@ export function EffortTrack(props: EffortTrackProps) {
 
 	const ticks = [];
 	for (let index = 0; index < count; index += 1) {
-		ticks.push(<span key={`tick-${props.efforts[index].id}`} style={{ ...styles.tick, left: offsetOf(index, count) }} />);
+		ticks.push(
+			<span
+				key={`tick-${props.efforts[index].id}`}
+				data-dsh-effort-picker-tick=""
+				style={{ ...styles.tick, left: offsetOf(index, count) }}
+			/>,
+		);
 	}
 
 	// 拖动时滑块与填充都按连续比例跟手，静止时停在当前档位。
@@ -43,6 +49,7 @@ export function EffortTrack(props: EffortTrackProps) {
 		props.shownRatio === null ? null : (
 			<span
 				ref={props.thumbRef}
+				data-dsh-effort-picker-thumb=""
 				style={{
 					...styles.thumb,
 					...(props.dragging ? styles.thumbActive : {}),
@@ -63,6 +70,7 @@ export function EffortTrack(props: EffortTrackProps) {
 		props.shownRatio === null ? null : (
 			<span
 				ref={props.fillRef}
+				data-dsh-effort-picker-fill=""
 				style={{
 					...styles.fill,
 					width: centerAt(props.shownRatio),
@@ -75,6 +83,7 @@ export function EffortTrack(props: EffortTrackProps) {
 		<div
 			ref={props.trackRef}
 			role="slider"
+			data-dsh-effort-picker-track=""
 			tabIndex={props.locked ? -1 : 0}
 			aria-label="推理等级"
 			aria-valuemin={1}

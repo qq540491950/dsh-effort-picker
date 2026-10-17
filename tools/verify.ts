@@ -254,6 +254,14 @@ function loadClientBundle(): LoadedBundle {
 			addEventListener: () => {},
 			removeEventListener: () => {},
 			body: {},
+			head: { appendChild: () => {} },
+			createElement: () => ({
+				style: {},
+				dataset: {},
+				setAttribute: () => {},
+				textContent: '',
+				remove: () => {},
+			}),
 		},
 		Element: class Element {},
 		queueMicrotask: (fn: () => void) => fn(),
@@ -360,6 +368,11 @@ function createHarness(options: HarnessOptions = {}): Harness {
 	const registrations: Harness['registrations'] = [];
 	const injected: string[][] = [];
 	const ctx = {
+		// Cordis 的副作用登记：立刻执行回调，把它的 disposer 当作返回值。
+		// 形状兜底样式表就挂在这里（`apply` 一进来就注入）。
+		effect(callback: () => () => void) {
+			return callback();
+		},
 		inject(services: string[], callback: (scope: any) => void) {
 			injected.push(services);
 			const scope: any = {
@@ -691,23 +704,35 @@ check('滑块落在中间档位（ratio 0.5）', /0\.5\)$/.test(thumb.props.styl
 const fill = track.children[0];
 check('进度填充铺到当前档位（ratio 0.5）', /0\.5\)$/.test(fill.props.style.width), String(fill.props.style.width));
 // 形状：轨道与填充都必须是**胶囊**（半径取到半高，左右两端都是半圆），滑块必须是**正圆**。
-// 这三条是参考图的硬性形状语言，被单独拎出来断言——历史上就出现过"轨道看着像圆角矩形"的返工。
+// 这三条是参考图的硬性形状语言，被单独拎出来断言——历史上就出现过"轨道看着像圆角矩形"的返工，
+// 后来在真实 DSH 里又复现：内联的 999px / 50% 被渲染成约 8px 圆角（用户截图实测）。
+// 所以现在每一条都是"内联 + 兜底"双保险，缺一半就失败。
+const SHAPE_CSS = String(clientExports.SHAPE_CSS);
 check(
-	'轨道两端是半圆（胶囊：borderRadius 999px，且高度 22px 的半径封顶在 11px）',
-	track.props.style.borderRadius === '999px',
-	String(track.props.style.borderRadius),
+	'形状兜底样式表给轨道/填充/停靠点/滑块都写了 !important 圆角',
+	['track', 'fill', 'tick', 'thumb'].every((name) => SHAPE_CSS.includes(`[data-dsh-effort-picker-${name}]`)) &&
+		SHAPE_CSS.includes('border-radius:999px!important') &&
+		SHAPE_CSS.includes('border-radius:50%!important'),
+	SHAPE_CSS,
 );
 check(
-	'进度填充两端也是半圆（否则右端会在滑块下面露出直边）',
-	fill.props.style.borderRadius === '999px',
-	String(fill.props.style.borderRadius),
+	'轨道两端是半圆（borderRadius 999px + 兜底样式表命中它）',
+	track.props.style.borderRadius === '999px' && track.props['data-dsh-effort-picker-track'] === '',
+	`${String(track.props.style.borderRadius)} / ${String(track.props['data-dsh-effort-picker-track'])}`,
 );
 check(
-	'滑块是正圆（宽高相等 + borderRadius 50%）',
+	'进度填充两端也是半圆（borderRadius + clip-path 双保险）',
+	fill.props.style.borderRadius === '999px' && String(fill.props.style.clipPath).includes('round'),
+	`${String(fill.props.style.borderRadius)} / ${String(fill.props.style.clipPath)}`,
+);
+check(
+	'滑块是正圆（宽高相等 + borderRadius 50% + clip-path circle）',
 	thumb.props.style.width === '25px' &&
 		thumb.props.style.height === '25px' &&
-		thumb.props.style.borderRadius === '50%',
-	`${String(thumb.props.style.width)}/${String(thumb.props.style.height)}/${String(thumb.props.style.borderRadius)}`,
+		thumb.props.style.borderRadius === '50%' &&
+		thumb.props.style.clipPath === 'circle(50%)' &&
+		thumb.props['data-dsh-effort-picker-thumb'] === '',
+	`${String(thumb.props.style.width)}/${String(thumb.props.style.height)}/${String(thumb.props.style.borderRadius)}/${String(thumb.props.style.clipPath)}`,
 );
 const trackHeightPx = Number(String(track.props.style.height).replace('px', ''));
 check(
@@ -748,6 +773,11 @@ check(
 	'停靠点掺了 label-primary（浅色主题下变浅灰点，而不是彻底消失的裸白点）',
 	String(tickNode?.props.style.background).includes('--dsw-alias-label-primary'),
 	String(tickNode?.props.style.background),
+);
+check(
+	'停靠点也是圆的（clip-path circle + 兜底样式表，宿主改圆角也压不方）',
+	tickNode?.props.style.clipPath === 'circle(50%)' && tickNode?.props['data-dsh-effort-picker-tick'] === '',
+	String(tickNode?.props.style.clipPath),
 );
 //#endregion
 

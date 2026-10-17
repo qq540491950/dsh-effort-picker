@@ -14,11 +14,44 @@ import type { ClientContext } from './services';
 export { estimatePanelPosition } from './placement';
 
 /**
+ * 形状兜底样式表（唯一的 CSS 注入）。
+ *
+ * 为什么需要它：实测在 DSH 的 popover 里，我们内联写的 `border-radius: 999px / 50%`
+ * 会被渲染成约 8px 的圆角——轨道两端从半圆变成圆角矩形、滑块从正圆变成圆角方块
+ * （用户截图实测，见 AGENTS.md 第 3 节的形状一行）。内联声明被**后来的**同等声明盖掉时，
+ * 只有 `!important` 能赢；而 `clip-path` 虽然也抗改圆角，却会连子树一起裁，
+ * 把滑块探出轨道的那 1.5px 切平，所以轨道只能用这条样式表。
+ *
+ * 选择器全部基于我们自己的 data 属性，不会波及宿主 UI；生命周期由 `ctx.effect` 管，
+ * 插件卸载/热替换时自动移除。
+ */
+export const SHAPE_CSS = [
+	'[data-dsh-effort-picker-track]{border-radius:999px!important}',
+	'[data-dsh-effort-picker-fill]{border-radius:999px!important}',
+	'[data-dsh-effort-picker-tick]{border-radius:50%!important}',
+	'[data-dsh-effort-picker-thumb]{border-radius:50%!important}',
+].join('');
+
+/** 把 {@link SHAPE_CSS} 插进 `<head>`，返回移除函数（给 `ctx.effect` 当 disposer）。 */
+function installShapeStyles(): () => void {
+	if (typeof document === 'undefined') return () => {};
+	const head = document.head;
+	if (head === undefined) return () => {};
+	const style = document.createElement('style');
+	style.setAttribute('data-dsh-effort-picker', 'shape');
+	style.textContent = SHAPE_CSS;
+	head.appendChild(style);
+	return () => style.remove();
+}
+
+/**
  * 客户端插件体：以 priority -1 遮蔽官方的 `conversation.input.model` 座位。
  *
  * @param ctx - 客户端根上下文。
  */
 export function apply(ctx: ClientContext): void {
+	ctx.effect(installShapeStyles);
+
 	// 注入清单必须覆盖**官方代码经由 `this.ctx` 碰到的每一项服务**。
 	//
 	// Cordis 的 Service 方法被外部插件调用时，`this.ctx` 会重绑到**调用方**的上下文。

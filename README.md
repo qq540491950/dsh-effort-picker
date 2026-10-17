@@ -144,8 +144,8 @@ node D:\project\dsh-plugins\dsh-effort-picker\tools\verify.ts `
 都算通过；`--yaml` 可选，用真实 YAML 解析器校验该 patch 能解析。不带 `--patch` 时只有第 12b 组跳过。）
 
 自检是纯 Node、零依赖的离线程序（本身也是 TS，靠 Node 原生类型剥离直接跑）：用 `node:vm` 跑
-**真实的** `lib/client.js`，喂一个极简 React 替身与假 ctx，覆盖 16 组共 111 条断言（带 `--patch` 时
-113 条）。全部通过时打印 `全部通过 ✓` 并以 0 退出。
+**真实的** `lib/client.js`，喂一个极简 React 替身与假 ctx，覆盖 16 组共 113 条断言（带 `--patch` 时
+115 条）。全部通过时打印 `全部通过 ✓` 并以 0 退出。
 
 ## 出问题时
 
@@ -190,8 +190,19 @@ node D:\project\dsh-plugins\dsh-effort-picker\tools\verify.ts `
 - **停靠点是"淡淡的小白点"**：4px 直径、把「白 62% + label-primary 38%」再降到 34% 透明叠上去
   （实测参考图为白 28.6% 叠在填充上）。用 label-primary 掺色是为了浅色主题——裸半透明白点落在浅灰
   轨道上会彻底消失（实测踩过）；深色主题下 label-primary 近白，看起来就是参考图那种"只亮一点点"。
-- **圆钮是干净的白球**：没有品牌色光晕、没有大投影，只有 1px `rgba(0,0,0,.08)` 描边（浅色主题下
-  白球压浅轨时勾边界）和一层几乎贴着球的落影；按下时只加深落影，不再发光。
+- **圆钮是干净的白球**：没有品牌色光晕、没有大投影；边界用 `inset 0 0 0 1px rgba(0,0,0,.10)`
+  （画在球**内侧**——外侧投影会被 `clip-path` 裁掉）。按下时只把内侧描边加深一点。
+- **形状三层保险**（轨道与填充必须是胶囊、圆钮与停靠点必须是正圆）：
+  1. 内联 `borderRadius: 999px / 50%`；
+  2. `clipPath: 'inset(0 round 999px)'` / `'circle(50%)'`——填充、停靠点、滑块各带一份，
+     这是独立于圆角的裁剪几何，宿主改圆角也压不扁；
+  3. `src/client/index.ts` 的 `SHAPE_CSS` 用 `ctx.effect` 注入
+     `[data-dsh-effort-picker-*]{border-radius:…!important}`——**轨道只能靠这一层**：
+     `clip-path` 会连子树一起裁，那样会把探出轨道 1.5px 的滑块切平。
+
+  为什么要这么麻烦：实测在 DSH 的 popover 里，内联的 `999px / 50%` 会被渲染成**约 8px 圆角**
+  （轨道两端变成圆角矩形、圆钮变成圆角方块）；`!important` 是唯一能赢过它的声明，`clip-path`
+  是不受它影响的几何。verify 第 7 组把这三层都钉成了断言。
 - **轨道底色必须掺一档 `label-primary`**（`color-mix` 10% + `bg-layer-2`）：菜单面是**半透明**材质
   （深色主题 `#43454a73`、浅色主题 `#f8f9fa94`），直接拿 `bg-layer-2` 当轨道底色时它与面板几乎同色
   （深色主题两者都≈`#2c2c2e`，浅色主题都≈白）——滑轨会整条"糊"进面板，看不出轨道有多长。掺一档
