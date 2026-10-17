@@ -52,6 +52,9 @@ export interface DirectorySnapshot {
 	pending: unknown;
 	/** 上一次操作的失败文案（已经是给人看的字符串）。 */
 	error: string | null;
+	/** 官方快照里还有这两个字段；本插件不读，写出来是为了让夹具能如实构造快照。 */
+	routable?: boolean;
+	failures?: unknown[];
 }
 
 /** `directory.select()` 的结果：`ok: false` 时 `error.code` 决定提示语。 */

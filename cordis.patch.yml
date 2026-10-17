@@ -1,0 +1,18 @@
+# dsh-effort-picker 自带的补丁层（`package.json` 的 `dsh.bundle.patch` 指向本文件）。
+#
+# 安装方式（二选一，都不需要手改 profile 的 cordis.patch.yml）：
+#
+#   · 让 DSH 安装本包（`plugin_manager` 的 `install_bundle`，target = 本目录）——
+#     profile 的 `package.json` 依赖与 `dsh.profile.bundles` 由安装器写，
+#     这一行随 bundle 一起生效；
+#   · 或按老办法在 profile 补丁层里手写同一个 insert 行（见 README「安装」）。
+#
+# 为什么必须在 `insert:` 下：顶层裸写 `- id: X` 是"覆写已存在条目"，目标不存在时
+# Loader 会 warn 并丢弃该行（补丁层语义），表现就是"插件装上了却没有这一行"。
+#
+# `name` 必须等于 `package.json` 的 `name`（自检第 12 组会核对）。以 bundle 形态安装时，
+# 它由 profile 的 node_modules 解析；手写形态下也可以写绝对路径
+# `file:///D:/.../lib/index.js`，自检两种形态都认。
+- insert:
+    - id: dsh-effort-picker # Loader 条目 id
+      name: dsh-effort-picker # 必须等于 package.json 的 name

@@ -54,10 +54,28 @@
 `directory.store`，写入走 `directory.select({provider, model, reasoningEffort})`，
 只作用于**下一次请求**。
 
-## 安装（接线）
+## 安装
 
-装插件本身不需要 pnpm、不需要 `node_modules`、不改 profile 的 `package.json`（仓库里已提交
-构建好的 `lib/`）。只在 `C:\Users\admin\.dsh\profiles\desktop\cordis.patch.yml` 末尾加一个 insert 行：
+### 推荐：当成 bundle 安装（不手改 profile）
+
+仓库自身就是一个 bundle：`package.json` 的 `dsh.bundle.patch` 指向 [cordis.patch.yml](cordis.patch.yml)，
+那一层里的 `insert` 行就是接线本身。安装时由 DSH 写 profile 的 `package.json` 依赖与
+`dsh.profile.bundles`，卸载时随依赖一起消失——**不再有"仓库搬家要手改路径行"**这个坑。
+
+用 `plugin_manager` 的 `install_bundle`，target 传本仓库的绝对目录：
+
+```jsonc
+{ "action": "install_bundle", "target": "D:\\project\\dsh-plugins\\dsh-effort-picker" }
+```
+
+看返回里的 `application` 是否为 `applied`；界面若没变化，按 `Ctrl+R` 刷新一次。
+装完可以用 `cordis_inspect_query`（Client · `Slots.listSubTree`，root = `conversation.input.model`）
+确认台账里多了一条 `priority -1` 的 occupant。
+
+### 备选：profile 里手写一行（老办法）
+
+不想让 profile 依赖本仓库时，只在 `C:\Users\admin\.dsh\profiles\desktop\cordis.patch.yml`
+末尾加一个 insert 行：
 
 ```yaml
 - insert:
@@ -65,16 +83,18 @@
       name: 'file:///D:/project/dsh-plugins/dsh-effort-picker/lib/index.js'
 ```
 
-`name` 必须指向本仓库的 `lib/index.js`（正斜杠形式）。**仓库一搬家就要同步改这一行。**
-之后 `dsh-client-modules` 的投递链路会接手：从该条目的模块位置向上找最近的
-`package.json` → 读 `dsh.client` 声明 → 从 `exports["./client"]` 定位浏览器 bundle →
-Host 在 `/plugins` 下发布并写进浏览器 boot graph。
+`name` 必须指向本仓库的 `lib/index.js`（正斜杠形式）——**仓库一搬家就要同步改这一行**。
 
-保存后由 Loader 加载；界面若没变化，按 `Ctrl+R` 刷新一次。
+两种形态只差"这一行谁写"，之后 `dsh-client-modules` 的投递链路完全一样：从该条目的模块位置
+向上找最近的 `package.json` → 读 `dsh.client` 声明 → 从 `exports["./client"]` 定位浏览器 bundle
+→ Host 在 `/plugins` 下发布并写进浏览器 boot graph。
 
 ## 卸载 / 回滚
 
-删掉那个 insert 行即可，官方选择器立刻回来（客户端插件随 Loader 条目一起卸载）。
+- bundle 安装的：`plugin_manager` 里 `set_bundle` 关掉，或 `remove_bundle` 移除；
+- 手写行的：删掉那一行。
+
+官方选择器立刻回来（客户端插件随 Loader 条目一起卸载）。
 
 ## 开发（改代码）
 
@@ -82,7 +102,7 @@ Host 在 `/plugins` 下发布并写进浏览器 boot graph。
 pnpm install            # 一次即可：typescript / esbuild / @types/*
 pnpm typecheck          # src/ 与 tools/ 两份 tsconfig 都过一遍
 pnpm build              # src/ → lib/client.js + lib/index.js（并写 .build-manifest.json）
-node tools/verify.mjs   # 拿真实产物跑离线自检
+node tools/verify.ts   # 拿真实产物跑离线自检
 ```
 
 `lib/` 是**产物**：手改它，下一次构建就没了；只改 `src/` 不构建，自检会直接报
@@ -92,24 +112,25 @@ node tools/verify.mjs   # 拿真实产物跑离线自检
 ## 自检
 
 ```powershell
-node D:\project\dsh-plugins\dsh-effort-picker\tools\verify.mjs `
+node D:\project\dsh-plugins\dsh-effort-picker\tools\verify.ts `
      --patch "C:\Users\admin\.dsh\profiles\desktop\cordis.patch.yml" `
      --yaml "C:\Users\admin\AppData\Local\Temp\dsh-asar-probe\out\dsh\node_modules\yaml"
 ```
 
-（`--patch` 校验接线行还在不在、路径对不对；`--yaml` 可选，用真实 YAML 解析器校验 patch，
-不传就只做文本校验。不带 `--patch` 时只有第 12 组跳过，其余 14 组照样跑。）
+（`--patch` 校验"profile 到底接线了没有"：手写 insert 行，**或**把本包列进 `dsh.profile.bundles`
+都算通过；`--yaml` 可选，用真实 YAML 解析器校验该 patch 能解析。不带 `--patch` 时只有第 12b 组跳过。）
 
-自检是纯 Node、零依赖的离线程序：用 `node:vm` 跑**真实的** `lib/client.js`，喂一个极简 React
-替身与假 ctx，覆盖 16 组共 102 条断言。全部通过时打印 `全部通过 ✓` 并以 0 退出。
+自检是纯 Node、零依赖的离线程序（本身也是 TS，靠 Node 原生类型剥离直接跑）：用 `node:vm` 跑
+**真实的** `lib/client.js`，喂一个极简 React 替身与假 ctx，覆盖 16 组共 102 条断言。全部通过时打印
+`全部通过 ✓` 并以 0 退出。
 
 ## 出问题时
 
 | 症状 | 怎么办 |
 |---|---|
-| 界面里模型控件整个没了 | 重新保存一次 `lib/client.js`（内容不变也行），或按 `Ctrl+R`。不必重启 DSH |
+| 界面里模型控件整个没了 | 重新 `npm run build`（内容不变也行，mtime/size 变了宿主会发新 rev），或按 `Ctrl+R`。不必重启 DSH |
 | 想知道为什么失败 | 读 `localStorage["dsh-effort-picker:last-failure"]`，或看控制台 `[dsh-effort-picker]` 前缀的记录 |
-| 想立刻回到官方控件 | 删掉 profile 里的 insert 行 |
+| 想立刻回到官方控件 | bundle 安装的用 `set_bundle` 关掉 / `remove_bundle`；手写行的删掉那一行 |
 
 前两种都是"条目被退役"的表现，成因与恢复细节见 [AGENTS.md](AGENTS.md) 第 2、7 节。
 
@@ -174,11 +195,12 @@ dsh-effort-picker/
                      placement、dom、hooks、boundary、row、track、picker、index
   src/host/index.ts  宿主半边：空的 apply，只作为 Loader 的接线柱
   tools/build.ts     esbuild 构建：src/ → lib/*.js（产物自带 __ModuleLoader__ 外壳）
-  tools/verify.mjs   自检程序（纯 Node，零依赖）
+  tools/verify.ts   自检程序（纯 Node，零依赖）
   lib/client.js      产物：window.__ModuleLoader__ 懒 CJS bundle（**不要手改**）
   lib/index.js       产物：宿主半边 ESM
   lib/.build-manifest.json  产物清单：输入的 sha256，自检用它判断"源码改了没构建"
-  package.json       包清单：exports{"./client"} + dsh.client{platform:"web"}
+  package.json       包清单：exports{"./client"} + dsh.client{platform:"web"} + dsh.bundle.patch
+  cordis.patch.yml   bundle 自带的补丁层：insert 一行把本插件接进 Loader
   tsconfig.json      src/ 的类型检查（classic JSX：jsxFactory = h）
   tsconfig.tools.json tools/ 的类型检查（Node 直接跑 .ts，故要求 erasableSyntaxOnly）
   AGENTS.md          工程约束：硬规则、不变量、改动流程

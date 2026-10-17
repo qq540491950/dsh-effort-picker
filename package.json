@@ -11,6 +11,9 @@
     "./package.json": "./package.json"
   },
   "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
     "client": {
       "platform": "web"
     }
@@ -18,8 +21,8 @@
   "scripts": {
     "build": "node tools/build.ts",
     "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.tools.json",
-    "verify": "node tools/verify.mjs",
-    "check": "npm run typecheck && npm run build && node tools/verify.mjs"
+    "verify": "node tools/verify.ts",
+    "check": "npm run typecheck && npm run build && node tools/verify.ts"
   },
   "devDependencies": {
     "@floating-ui/dom": "^1.8.0",

@@ -9,7 +9,8 @@ DSH 桌面端（Web GUI）的**纯客户端**插件：把 composer 里官方的�
 Codex 风格的推理档位面板。
 
 - **自用维护，不发布**。`package.json` 里 `"private": true`；不做 npm 发布、不写发布流程、
-  不带版本发布脚本。接线只有一种：DSH profile 里的一个路径行。
+  不带版本发布脚本。接线有两种形态，二选一：**把本仓库当 bundle 安装**（`dsh.bundle.patch` 指向
+  仓内 `cordis.patch.yml`，安装器去写 profile），或**在 profile 补丁层里手写一行 insert**。
 - **运行时零依赖、源码是 TypeScript**。`src/**` 是唯一事实来源，`lib/*.js` 由 `tools/build.ts`
   （esbuild）生成——**改完必须 `npm run build`，永远不要手改 `lib/`**。第三方包只在构建期存在
   （会被打进产物），运行期仍然只向平台种子表要模块。
@@ -24,8 +25,9 @@ Codex 风格的推理档位面板。
 | `tools/build.ts` | 构建：esbuild 把 `src/` 打成 `lib/client.js`（外套 `__ModuleLoader__` 注册壳）与 `lib/index.js`，原子替换 + 写 `.build-manifest.json` | 高——外壳与 `id` 契约在这里，写错就整体不加载 |
 | `tsconfig.json` / `tsconfig.tools.json` | `src/` 与 `tools/` 的类型检查（classic JSX：`jsxFactory = h`） | 中——配置漂了就查不出类型错 |
 | `package.json` | 包清单契约（第 4 节）+ devDeps + 脚本 | 中——改错就整体不加载 |
+| `cordis.patch.yml` | bundle 自带的补丁层：`insert` 一行把本插件接进 Loader（`dsh.bundle.patch` 指向它） | 中——写错等于"装了却没生效" |
 | `lib/client.js` / `lib/index.js` | **产物**，不要手改 | 手改会被下次构建覆盖，且自检第 1 组会报"产物与源码不一致" |
-| `tools/verify.mjs` | 离线自检：纯 Node、无依赖，用 `node:vm` 跑**真实的** `lib/client.js` | 低；改它必须同步改断言，**不许为了让它变绿而放宽断言** |
+| `tools/verify.ts` | 离线自检：纯 Node、无依赖，用 `node:vm` 跑**真实的** `lib/client.js` | 低；改它必须同步改断言，**不许为了让它变绿而放宽断言** |
 | `README.md` | 面向使用者的介绍与使用说明 | 低 |
 | `AGENTS.md` | 本文件（工程约束） | 低 |
 
@@ -68,7 +70,7 @@ Error: cannot get property "remote.session" without inject
 ctx.inject(["slots", "modelDirectories", "sessions", "remote", "remote.session"], (scope) => { ... })
 ```
 
-`tools/verify.mjs` 第 4 节有专门针对它的回归护栏（逐项断言）。想删任何一项，先回答"官方那个方法会不会
+`tools/verify.ts` 第 4 节有专门针对它的回归护栏（逐项断言）。想删任何一项，先回答"官方那个方法会不会
 经 `this.ctx` 用到它"。
 
 ### 2.3 HMR 可能读到半截文件
@@ -120,6 +122,8 @@ bundle → Host 在 `/plugins` 下发布并写进浏览器 boot graph。
 - `exports["./client"]`：指向浏览器 bundle 的字符串。
 - `exports["./package.json"]`：`"./package.json"`（投递链路要读清单本身）。
 - `dsh.client.platform`：`"web"`。
+- `dsh.bundle.patch`：`"./cordis.patch.yml"`——声明"本包是 bundle，接线在仓内这一层"。
+  安装器据此把本包写进 profile 的 `dsh.profile.bundles`，profile 不再需要手写路径行。
 
 ## 5. 改动流程（做完算数才算完）
 
@@ -129,10 +133,11 @@ bundle → Host 在 `/plugins` 下发布并写进浏览器 boot graph。
 4. **跑自检**：
 
    ```powershell
-   node tools/verify.mjs
+   node tools/verify.ts
    ```
 
-   可选参数：`--patch <cordis.patch.yml 路径>` 校验接线行；再带 `--yaml <yaml 包目录>` 用真实 YAML
+   可选参数：`--patch <profile 的 cordis.patch.yml 路径>` 校验"profile 接线了没有"——手写 insert 行
+   或把本包列进 `dsh.profile.bundles`，两种形态都算通过；再带 `--yaml <yaml 包目录>` 用真实 YAML
    解析器校验（该目录需有 `dist/index.js`）。
 5. **必须看到 `全部通过 ✓` 且退出码 0**。失败时会打印 `失败 N 项：` 并 `exit 1`。
 6. 只有第 5 步过了才有资格说"改好了"。**禁止**在没跑自检、或自检失败的情况下汇报成功；也禁止用
@@ -146,8 +151,9 @@ bundle → Host 在 `/plugins` 下发布并写进浏览器 boot graph。
 紧凑模式保留档位、档位比模型名浅"）、滑杆 ARIA、停靠点数量、进度填充与滑块同源、主题适配（轨道掺色 /
 圆钮与停靠点带描边）、拖拽只提交一次且触发器不跟手跳、键盘调档、模型下钻（含"分组圆角卡片 + 组名暗两档
 + role=group"、"选模型带最高档 / 列表显示选中会带上的档位"）、档位未显式设置时滑块头仍在最高档且标
-「默认」、失败提示保留面板、面板落位（上方优先 / 放不下翻转 / 左右不越界）、profile 接线。第 12 节会把
-patch 里的路径行与**本机实际路径**比对，所以**仓库一搬家就必须同步改 profile 里的路径行**（forward slash 形式）。
+「默认」、失败提示保留面板、面板落位（上方优先 / 放不下翻转 / 左右不越界）、接线形态（bundle 补丁层；
+带 `--patch` 时再查 profile 是手写行还是 bundle 安装）。第 12 组会把补丁里的 id / name 与**本机实际路径**
+核对，所以**仓库搬家后要么重新安装 bundle，要么同步改 profile 里的路径行**（forward slash 形式）。
 
 ## 6. 提交与推送
 
@@ -163,18 +169,27 @@ patch 里的路径行与**本机实际路径**比对，所以**仓库一搬家�
 |---|---|---|
 | 界面里模型控件整个没了 | 条目被退役（2.1 / 2.3） | 重新 `npm run build`（内容不变也行，mtime/size 变了宿主就会发新 rev），或 `Ctrl+R` 刷新页面。不必重启 DSH |
 | 想看到失败原因 | — | 读 `localStorage["dsh-effort-picker:last-failure"]`，或看控制台 `[dsh-effort-picker]` 前缀（只有第一条） |
-| 想立刻回到官方控件 | — | 删掉 profile 里 `id: dsh-effort-picker` 那个 insert 行，官方选择器立刻回来 |
+| 想立刻回到官方控件 | — | bundle 形态用 `plugin_manager` 的 `set_bundle`（`enabled: false`）或 `remove_bundle`；手写形态删掉 `id: dsh-effort-picker` 那个 insert 行。官方选择器立刻回来 |
 
-## 8. 只碰自己那一行
+## 8. 安装形态：优先让安装器写 profile
 
 profile 是**用户的环境**，不是本仓库的一部分：`C:\Users\admin\.dsh\profiles\desktop\cordis.patch.yml`。
-在里面**只允许增删 `id: dsh-effort-picker` 这一个 insert 行**——其它条目的配置（模型、推理强度、
-搜索 provider、MCP、密钥）都不属于本任务范围，不要"顺手"改。补丁层里新增条目必须用 `insert:` 追加，
-裸写 `- id: ...` 会被当成覆盖目标，id 不存在时 Loader 报 `entry not found` 并丢弃该条。
+
+**首选**：用 `plugin_manager` 的 `install_bundle`（target = 本仓库绝对目录）。profile 的
+`package.json` 依赖、`dsh.profile.bundles` 以及 Loader 行都由安装器写——本仓库只提供
+`cordis.patch.yml` 那一层，不碰用户的其它配置。
+
+**备选**（手写行）时：在 profile 补丁层里**只允许增删 `id: dsh-effort-picker` 这一个 insert 行**——
+其它条目的配置（模型、推理强度、搜索 provider、MCP、密钥）都不属于本任务范围，不要"顺手"改。
+补丁层里新增条目必须用 `insert:` 追加，裸写 `- id: ...` 会被当成覆盖目标，id 不存在时 Loader 报
+`entry not found` 并丢弃该条。
+
+卸载：bundle 形态用 `set_bundle` / `remove_bundle`；手写形态删掉那一行。
 
 ## 9. 本机事实（会漂移，别当契约）
 
-- 仓库路径：`D:\project\dsh-plugins\dsh-effort-picker`（profile 里的路径行依赖它）。
+- 仓库路径：`D:\project\dsh-plugins\dsh-effort-picker`（手写行形态下 profile 的路径行依赖它；
+  bundle 形态下由安装器写下的 `file:` 依赖指向它，仓库搬家仍需重新安装）。
 - profile 补丁：`C:\Users\admin\.dsh\profiles\desktop\cordis.patch.yml`。
 - Node：v24.15.0（`tools/build.ts` 靠 Node 原生类型剥离直接跑 `.ts`，所以构建脚本只能写可擦除语法——
   `tsconfig.tools.json` 的 `erasableSyntaxOnly` 守着这条）；pnpm 12.14.0；TypeScript 5.9.3；esbuild 0.28.2。

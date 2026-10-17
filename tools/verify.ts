@@ -11,10 +11,15 @@
  *   6. 组件渲染：触发器文案、滑杆 ARIA、停靠点数量、滑块位置；
  *   7. 拖拽提交（一次手势只提交一次）、键盘调档、模型下钻、失败提示、子代理短路。
  *
- * 用法：
- *   node tools/verify.mjs
- *   node tools/verify.mjs --patch "C:\Users\admin\.dsh\profiles\desktop\cordis.patch.yml"
- *   node tools/verify.mjs --patch <...> --yaml <yaml 包目录>
+ * 用法（Node 24 直接跑 .ts，靠原生类型剥离；构建脚本同理）：
+ *   node tools/verify.ts
+ *   node tools/verify.ts --patch "C:\Users\admin\.dsh\profiles\desktop\cordis.patch.yml"
+ *   node tools/verify.ts --patch <...> --yaml <yaml 包目录>
+ *
+ * 它是**纯 TypeScript **，但只用到可擦除语法（`tsconfig.tools.json` 的 `erasableSyntaxOnly`
+ * 守着），所以不需要构建：`import type` 会在执行前被剥掉，运行时依赖只有 Node 标准库。
+ * 替身/夹具刻意用了宽松类型（`any`）——它们模拟的是动态的 React 元素树；真正被类型约束的是
+ * 夹具的数据形状（直接复用 `src/client/model.ts` 的领域类型，契约漂了这里会编译不过）。
  */
 
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
@@ -22,79 +27,117 @@ import { createHash } from 'node:crypto';
 import { join, dirname, resolve, isAbsolute, relative } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import vm from 'node:vm';
+import type { DirectorySnapshot, EffortLevel, ModelGroup, ModelSelection } from '../src/client/model.ts';
 
 const PACKAGE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
-const failures = [];
-const notes = [];
-function check(label, condition, detail) {
+const failures: string[] = [];
+const notes: string[] = [];
+function check(label: string, condition: unknown, detail?: unknown): boolean {
 	if (condition) {
 		console.log(`  ok   ${label}`);
 		return true;
 	}
-	failures.push(`${label}${detail === undefined ? '' : ` — ${detail}`}`);
-	console.log(`  FAIL ${label}${detail === undefined ? '' : ` — ${detail}`}`);
+	failures.push(`${label}${detail === undefined ? '' : ` — ${String(detail)}`}`);
+	console.log(`  FAIL ${label}${detail === undefined ? '' : ` — ${String(detail)}`}`);
 	return false;
 }
-function section(title) {
+function section(title: string): void {
 	console.log(title);
 }
 
 //#region 极简 React / DOM 替身
+/** 假元素：`type` 可能是标签名，也可能是组件函数；断言全靠 `props` / `children`。 */
+interface FakeElement {
+	type: any;
+	props: Record<string, any>;
+	children: any[];
+}
+
+/** 假 DOM 节点：够组件里那几处读宽高、拿 rect、抓指针即可。 */
+interface FakeDomNode {
+	tag: any;
+	offsetWidth: number;
+	offsetHeight: number;
+	getBoundingClientRect: () => { left: number; top: number; right: number; bottom: number; width: number; height: number };
+	contains: () => boolean;
+	querySelector: () => null;
+	focus: () => void;
+	setPointerCapture: () => void;
+}
+
 /**
  * 极简 class 组件基类：只实现 `state` / `setState`，刚好够跑错误边界协议
  * （`getDerivedStateFromError` + `componentDidCatch`）。
  */
 class ComponentStub {
-	constructor(props) {
+	props: Record<string, any>;
+
+	state: Record<string, any>;
+
+	constructor(props?: Record<string, any>) {
 		this.props = props ?? {};
-		this.state = this.state ?? {};
+		this.state = {};
 	}
 
-	setState(next) {
-		this.state = { ...this.state, ...(typeof next === 'function' ? next(this.state) : next) };
+	setState(next: unknown): void {
+		const patch = typeof next === 'function' ? (next as (state: Record<string, any>) => unknown)(this.state) : next;
+		this.state = { ...this.state, ...(patch as Record<string, any>) };
 	}
 }
 
+/** 本插件用到的钩子 + createElement；别的 React API 故意不实现（用不到就不给假象）。 */
+interface ReactStub {
+	Component: typeof ComponentStub;
+	reset(): void;
+	mount(): void;
+	useState<T>(initial: T | (() => T)): [T, (next: T | ((previous: T) => T)) => void];
+	useRef<T>(initial: T): { current: T };
+	useEffect(): void;
+	useLayoutEffect(): void;
+	useSyncExternalStore<T>(subscribe: (listener: () => void) => () => void, getSnapshot: () => T): T;
+	createElement(type: any, props?: Record<string, any> | null, ...children: any[]): FakeElement;
+}
+
 /** 让 useState 真正保存状态、useRef 真正持有对象，从而能观察交互后的重渲染。 */
-function createReactStub() {
-	const state = [];
+function createReactStub(): ReactStub {
+	const slots: any[] = [];
 	let cursor = 0;
-	const react = {
+	const react: ReactStub = {
 		Component: ComponentStub,
 		reset() {
 			cursor = 0;
 		},
 		mount() {
-			state.length = 0;
+			slots.length = 0;
 			cursor = 0;
 		},
-		useState(initial) {
+		useState<T>(initial: T | (() => T)) {
 			const slot = cursor;
 			cursor += 1;
-			if (!(slot in state)) state[slot] = typeof initial === 'function' ? initial() : initial;
+			if (!(slot in slots)) slots[slot] = typeof initial === 'function' ? (initial as () => T)() : initial;
 			return [
-				state[slot],
-				(next) => {
-					state[slot] = typeof next === 'function' ? next(state[slot]) : next;
+				slots[slot] as T,
+				(next: T | ((previous: T) => T)) => {
+					slots[slot] = typeof next === 'function' ? (next as (previous: T) => T)(slots[slot] as T) : next;
 				},
 			];
 		},
-		useRef(initial) {
+		useRef<T>(initial: T) {
 			const slot = cursor;
 			cursor += 1;
-			if (!(slot in state)) state[slot] = { current: initial };
-			return state[slot];
+			if (!(slot in slots)) slots[slot] = { current: initial };
+			return slots[slot] as { current: T };
 		},
 		useEffect() {},
 		useLayoutEffect() {},
-		useSyncExternalStore(_subscribe, getSnapshot) {
+		useSyncExternalStore<T>(_subscribe: (listener: () => void) => () => void, getSnapshot: () => T): T {
 			return getSnapshot();
 		},
-		createElement(type, props, ...children) {
+		createElement(type: any, props?: Record<string, any> | null, ...children: any[]): FakeElement {
 			const { ref, ...rest } = props ?? {};
 			if (ref !== undefined && typeof ref === 'object' && ref !== null && 'current' in ref) {
-				ref.current = createFakeNode(type);
+				(ref as { current: unknown }).current = createFakeNode(type);
 			}
 			return { type, props: rest, children };
 		},
@@ -102,7 +145,7 @@ function createReactStub() {
 	return react;
 }
 
-function createFakeNode(tag) {
+function createFakeNode(tag: any): FakeDomNode {
 	return {
 		tag,
 		offsetWidth: 300,
@@ -116,21 +159,23 @@ function createFakeNode(tag) {
 }
 
 /** ui-primitives 替身：每个导出都渲染成一个带标记的 span。 */
-function createPrimitivesStub(react) {
-	const icon = (name) => (props) => react.createElement('span', { 'data-icon': name, style: props?.style });
+function createPrimitivesStub(react: ReactStub): Record<string, (props: Record<string, any>) => FakeElement> {
+	const icon = (name: string) => (props: Record<string, any>) =>
+		react.createElement('span', { 'data-icon': name, style: props?.style });
 	return {
-		MenuSurface: (props) => react.createElement('div', { 'data-surface': 'menu', style: props?.style }, props?.children),
+		MenuSurface: (props: Record<string, any>) =>
+			react.createElement('div', { 'data-surface': 'menu', style: props?.style }, props?.children),
 		IconDataOutlineRegular: icon('data'),
 		IconChevronDownOutlineRegular: icon('chevron-down'),
 		IconChevronRightOutlineRegular: icon('chevron-right'),
 		IconChevronLeftOutlineRegular: icon('chevron-left'),
 		IconCheckOutlineRegular: icon('check'),
-		StateDot: (props) => react.createElement('span', { 'data-state': props?.state }),
+		StateDot: (props: Record<string, any>) => react.createElement('span', { 'data-state': props?.state }),
 	};
 }
 
 /** 遍历元素树。 */
-function walk(node, visit) {
+function walk(node: any, visit: (node: FakeElement) => void): void {
 	if (node === null || node === undefined || typeof node === 'boolean') return;
 	if (Array.isArray(node)) {
 		for (const child of node) walk(child, visit);
@@ -141,15 +186,15 @@ function walk(node, visit) {
 	for (const child of node.children ?? []) walk(child, visit);
 }
 
-function findAll(tree, predicate) {
-	const out = [];
+function findAll(tree: any, predicate: (node: FakeElement) => boolean): FakeElement[] {
+	const out: FakeElement[] = [];
 	walk(tree, (node) => {
 		if (predicate(node)) out.push(node);
 	});
 	return out;
 }
 
-function textOf(tree) {
+function textOf(tree: any): string {
 	let text = '';
 	walk(tree, (node) => {
 		for (const child of node.children ?? []) if (typeof child === 'string') text += child;
@@ -159,33 +204,44 @@ function textOf(tree) {
 //#endregion
 
 //#region 载入 bundle
-const manifest = JSON.parse(readFileSync(join(PACKAGE_ROOT, 'package.json'), 'utf8'));
+/** 只声明自检真正读的字段（包清单契约见 AGENTS.md 第 4 节）。 */
+interface PackageManifest {
+	name: string;
+	exports: Record<string, string>;
+	dsh?: { client?: { platform?: string }; bundle?: { patch?: string } };
+}
+const manifest: PackageManifest = JSON.parse(readFileSync(join(PACKAGE_ROOT, 'package.json'), 'utf8'));
 const clientPath = resolve(PACKAGE_ROOT, manifest.exports['./client']);
 const clientSource = readFileSync(clientPath, 'utf8');
 const reactStub = createReactStub();
 const primitivesStub = createPrimitivesStub(reactStub);
-const reactDomStub = { createPortal: (element) => element };
+const reactDomStub = { createPortal: (element: any) => element };
 /** 沙箱 console 替身：记录上报内容，供"失败必须被上报"的断言使用。 */
-const consoleErrors = [];
+const consoleErrors: string[] = [];
 /** 沙箱定时器替身：只记录被排期的回调（边界自动重试是 150ms 级，测试里不真的跑）。 */
-const pendingTimers = [];
+const pendingTimers: Array<() => void> = [];
 
-function loadClientBundle() {
-	let captured;
+interface LoadedBundle {
+	registration: { id: string; factory: (require: (specifier: string) => unknown) => any };
+	exports: any;
+}
+
+function loadClientBundle(): LoadedBundle {
+	let captured: LoadedBundle['registration'] | undefined;
 	const sandbox = {
 		console: {
-			error: (...parts) => consoleErrors.push(parts.map((part) => String(part)).join(' ')),
+			error: (...parts: unknown[]) => consoleErrors.push(parts.map((part) => String(part)).join(' ')),
 			warn: () => {},
 			log: () => {},
 		},
-		setTimeout: (fn) => {
+		setTimeout: (fn: () => void) => {
 			pendingTimers.push(fn);
 			return pendingTimers.length;
 		},
 		clearTimeout: () => {},
 		window: {
 			__ModuleLoader__: {
-				load(registration) {
+				load(registration: LoadedBundle['registration']) {
 					captured = registration;
 				},
 			},
@@ -200,11 +256,11 @@ function loadClientBundle() {
 			body: {},
 		},
 		Element: class Element {},
-		queueMicrotask: (fn) => fn(),
+		queueMicrotask: (fn: () => void) => fn(),
 	};
 	vm.runInNewContext(clientSource, sandbox, { filename: 'lib/client.js' });
 	if (captured === undefined) throw new Error('bundle 没有调用 window.__ModuleLoader__.load');
-	const exports = captured.factory((specifier) => {
+	const exports = captured.factory((specifier: string) => {
 		if (specifier === 'react') return reactStub;
 		if (specifier === 'react-dom') return reactDomStub;
 		if (specifier === '@deepseek-ai/dsh-client-ui-primitives') return primitivesStub;
@@ -216,11 +272,11 @@ function loadClientBundle() {
 //#endregion
 
 //#region 假 ctx / 假目录服务
-const EFFORT_LEVELS = ['off', 'low', 'medium', 'high', 'max'].map((id) => ({
+const EFFORT_LEVELS: EffortLevel[] = ['off', 'low', 'medium', 'high', 'max'].map((id) => ({
 	id,
 	name: `${id.charAt(0).toUpperCase()}${id.slice(1)}`,
 }));
-const GROUPS = [
+const GROUPS: ModelGroup[] = [
 	{
 		id: 'cpa',
 		name: 'cpa',
@@ -239,7 +295,7 @@ const GROUPS = [
 		],
 	},
 ];
-const SNAPSHOT = {
+const SNAPSHOT: DirectorySnapshot = {
 	status: 'ready',
 	current: { provider: 'cpa', model: 'cn:deepseek-v4.1-flash', reasoningEffort: 'medium' },
 	retainedEffort: undefined,
@@ -250,12 +306,33 @@ const SNAPSHOT = {
 	error: null,
 };
 
+/** `createHarness` 的可调开关。 */
+interface HarnessOptions {
+	/** false：模拟被寻址的子代理会话（`sessions.subagentAddress` 返回地址）。 */
+	available?: boolean;
+	/** `directory.select()` 的返回值；用来测"选择被拒"。 */
+	selectOutcome?: unknown;
+	/** 覆盖目录快照。 */
+	snapshot?: DirectorySnapshot;
+	/** true：模拟官方 `directoryFor()` 在调用方上下文里 fail loud。 */
+	directoryThrows?: boolean;
+}
+
+/** 假宿主环境的可观察面。 */
+interface Harness {
+	ctx: any;
+	registrations: Array<{ registration: any; component: any }>;
+	calls: { load: number; select: ModelSelection[] };
+	directory: any;
+	injected: string[][];
+}
+
 /**
  * 搭一个可观察的宿主环境。
  * @param options - available / selectOutcome / snapshot / directoryThrows。
  */
-function createHarness(options = {}) {
-	const calls = { load: 0, select: [] };
+function createHarness(options: HarnessOptions = {}): Harness {
+	const calls: Harness['calls'] = { load: 0, select: [] };
 	const directory = {
 		store: {
 			getSnapshot: () => options.snapshot ?? SNAPSHOT,
@@ -265,7 +342,7 @@ function createHarness(options = {}) {
 			calls.load += 1;
 			return options.snapshot ?? SNAPSHOT;
 		},
-		select: async (selection) => {
+		select: async (selection: ModelSelection) => {
 			calls.select.push(selection);
 			return options.selectOutcome ?? { ok: true, value: undefined };
 		},
@@ -280,20 +357,20 @@ function createHarness(options = {}) {
 	};
 	const subagentAddress = () => (options.available === false ? { agentId: 'a', sessionId: 's' } : undefined);
 
-	const registrations = [];
-	const injected = [];
+	const registrations: Harness['registrations'] = [];
+	const injected: string[][] = [];
 	const ctx = {
-		inject(services, callback) {
+		inject(services: string[], callback: (scope: any) => void) {
 			injected.push(services);
-			const scope = {
+			const scope: any = {
 				modelDirectories,
 				sessions: { subagentAddress },
 				slots: {
-					inject(key, cb) {
+					inject(key: string, cb: () => unknown) {
 						scope.slots.key = key;
 						return cb();
 					},
-					register(registration, component) {
+					register(registration: any, component: any) {
 						registrations.push({ registration, component });
 						return () => {};
 					},
@@ -313,7 +390,7 @@ function createHarness(options = {}) {
  * @param depth - 递归深度护栏。
  * @returns 展开后的节点（宿主元素、null 或文本）。
  */
-function expandElement(node, depth = 0) {
+function expandElement(node: any, depth = 0): any {
 	if (depth > 16) return node;
 	const type = node?.type;
 	if (typeof type !== 'function') return node;
@@ -343,12 +420,12 @@ function expandElement(node, depth = 0) {
  * @param props - owner 份额 + 注入面。
  * @returns 宿主元素树，或 null。
  */
-function renderSeat(component, props) {
+function renderSeat(component: any, props: any): any {
 	return expandElement(component(props));
 }
 
 /** 挂载一次座位组件，返回可继续交互的句柄。 */
-function mountSeat(harness, slot = 'conversation.input.model') {
+function mountSeat(harness: Harness, slot = 'conversation.input.model') {
 	const entry = harness.registrations.find((item) => item.registration.name === slot);
 	if (entry === undefined) throw new Error(`没有注册座位 ${slot}`);
 	const face = entry.registration.inject('session-test');
@@ -360,7 +437,7 @@ function mountSeat(harness, slot = 'conversation.input.model') {
 	return { entry, face, render, tree: render() };
 }
 
-function fakePointerEvent(clientX) {
+function fakePointerEvent(clientX: number) {
 	return {
 		clientX,
 		pointerId: 1,
@@ -370,7 +447,7 @@ function fakePointerEvent(clientX) {
 	};
 }
 
-function findByRole(tree, role) {
+function findByRole(tree: any, role: string): FakeElement[] {
 	return findAll(tree, (node) => node.props?.role === role);
 }
 //#endregion
@@ -391,7 +468,7 @@ const buildManifest = existsSync(buildManifestPath)
 	: null;
 check('存在构建清单 lib/.build-manifest.json', buildManifest !== null, buildManifestPath);
 if (buildManifest !== null) {
-	const sha256 = (path) => createHash('sha256').update(readFileSync(path)).digest('hex');
+	const sha256 = (path: string) => createHash('sha256').update(readFileSync(path)).digest('hex');
 	const stale = [];
 	for (const target of buildManifest.targets ?? []) {
 		for (const [input, digest] of Object.entries(target.inputs ?? {})) {
@@ -481,14 +558,14 @@ const coldHarness = createHarness({ directoryThrows: true });
 clientExports.apply(coldHarness.ctx);
 const coldSeat = coldHarness.registrations[0];
 let coldFace;
-let injectThrew = null;
+let injectThrew: unknown = null;
 try {
 	coldFace = coldSeat.registration.inject('session-cold');
 } catch (error) {
 	injectThrew = error;
 }
 check('inject 工厂不抛错（抛错会让 DSH 退役整个条目）', injectThrew === null, String(injectThrew));
-let resolveThrew = null;
+let resolveThrew: unknown = null;
 try {
 	coldFace.resolve();
 } catch (error) {
@@ -496,7 +573,7 @@ try {
 }
 check(
 	'解析失败推迟到渲染期的 resolve()',
-	resolveThrew?.message.includes('without inject') === true,
+	(resolveThrew as Error | null)?.message.includes('without inject') === true,
 	String(resolveThrew),
 );
 reactStub.mount();
@@ -678,7 +755,7 @@ section('8b) 连续跟手');
 const followHarness = createHarness();
 clientExports.apply(followHarness.ctx);
 const followSeat = mountSeat(followHarness);
-const findTrack = (tree) =>
+const findTrack = (tree: any) =>
 	findAll(tree, (node) => typeof node.type === 'function' && node.type.name === 'EffortTrack')[0];
 findAll(followSeat.tree, (node) => node.props?.['aria-haspopup'] === 'dialog')[0].props.onClick();
 const followNode = findTrack(followSeat.render());
@@ -906,29 +983,57 @@ if (typeof estimate === 'function') {
 }
 //#endregion
 
-//#region 12. profile 接线
+//#region 12. 接线形态
 const args = process.argv.slice(2);
 const patchArg = args[args.indexOf('--patch') + 1];
 const yamlArg = args[args.indexOf('--yaml') + 1];
+
+// 形态一（推荐）：本仓库自己就是 bundle —— 自带补丁层，安装时由安装器写 profile。
+section('12) 接线：bundle 自带补丁层 cordis.patch.yml');
+const bundlePatchPath = join(PACKAGE_ROOT, 'cordis.patch.yml');
+check(
+	'package.json 声明 dsh.bundle.patch',
+	manifest.dsh?.bundle?.patch === './cordis.patch.yml',
+	String(manifest.dsh?.bundle?.patch),
+);
+check('补丁层文件存在', existsSync(bundlePatchPath), bundlePatchPath);
+const bundlePatchText = existsSync(bundlePatchPath) ? readFileSync(bundlePatchPath, 'utf8') : '';
+check(
+	'补丁层在 insert 下写了本插件的条目（id / name 都等于包名）',
+	new RegExp(`- insert:[\\s\\S]*id: ${manifest.name}[\\s\\S]*name: '?${manifest.name}'?`).test(bundlePatchText),
+	bundlePatchText.trim().split('\n').slice(-2).join(' | '),
+);
+
+// 形态二：老办法 —— profile 的补丁层里手写一行（`--patch <profile 的 cordis.patch.yml>`）。
+// 两种形态都合法；只要有**一种**成立就算接线完整，都没有则失败（表现是"装了却没生效"）。
 if (!args.includes('--patch')) {
-	section('12) profile 接线 —— 跳过（未传 --patch）');
+	section('12b) profile 接线 —— 跳过（未传 --patch）');
 } else {
-	section('12) profile 接线 cordis.patch.yml');
-	const patchPath = isAbsolute(patchArg) ? patchArg : resolve(process.cwd(), patchArg);
+	section('12b) profile 接线（手写 insert 行 或 bundle 安装）');
+	const patchPath =
+		patchArg === undefined ? '' : isAbsolute(patchArg) ? patchArg : resolve(process.cwd(), patchArg);
 	check('patch 文件存在', existsSync(patchPath), patchPath);
-	const text = readFileSync(patchPath, 'utf8');
-	const expectedName = `file:///${resolve(PACKAGE_ROOT, manifest.exports['.']).replaceAll('\\', '/')}`;
-	check('patch 内含本插件的路径行', text.includes(expectedName), expectedName);
-	if (!args.includes('--yaml')) {
-		console.log('  --   跳过 YAML 解析（未传 --yaml <yaml 包目录>）');
-	} else {
+	const text = existsSync(patchPath) ? readFileSync(patchPath, 'utf8') : '';
+	const pathForm = `file:///${resolve(PACKAGE_ROOT, manifest.exports['.']).replaceAll('\\', '/')}`;
+	const manualRow =
+		text.includes(pathForm) ||
+		new RegExp(`id:\\s*${manifest.name}[\\s\\S]{0,200}?name:\\s*['"]?${manifest.name}['"]?`).test(text);
+	const profilePackagePath = join(dirname(patchPath), 'package.json');
+	const profileBundles: string[] = existsSync(profilePackagePath)
+		? (JSON.parse(readFileSync(profilePackagePath, 'utf8')).dsh?.profile?.bundles ?? [])
+		: [];
+	const installedAsBundle = profileBundles.includes(manifest.name);
+	check(
+		'profile 已接线（手写 insert 行，或把本包列进 dsh.profile.bundles）',
+		manualRow || installedAsBundle,
+		`手写行=${String(manualRow)} bundle=${String(installedAsBundle)}`,
+	);
+	if (args.includes('--yaml')) {
 		const yamlModule = await import(pathToFileURL(resolve(yamlArg, 'dist/index.js')).href);
 		const parsed = yamlModule.parse(text);
-		check('patch 顶层是数组', Array.isArray(parsed), typeof parsed);
-		const rows = (Array.isArray(parsed) ? parsed : []).flatMap((entry) => entry.insert ?? []);
-		const row = rows.find((candidate) => candidate.id === 'dsh-effort-picker');
-		check('存在 id=dsh-effort-picker 的 insert 行', row !== undefined);
-		check('该行 name 指向宿主半边', row?.name === expectedName, String(row?.name));
+		check('profile patch 顶层是数组', Array.isArray(parsed), typeof parsed);
+	} else {
+		console.log('  --   跳过 YAML 解析（未传 --yaml <yaml 包目录>）');
 	}
 }
 //#endregion
