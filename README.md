@@ -62,15 +62,38 @@
 那一层里的 `insert` 行就是接线本身。安装时由 DSH 写 profile 的 `package.json` 依赖与
 `dsh.profile.bundles`，卸载时随依赖一起消失——**不再有"仓库搬家要手改路径行"**这个坑。
 
-用 `plugin_manager` 的 `install_bundle`，target 传本仓库的绝对目录：
+两种入口，装的是同一个东西：
 
-```jsonc
-{ "action": "install_bundle", "target": "D:\\project\\dsh-plugins\\dsh-effort-picker" }
-```
+| 场景 | 填什么 | 装完是什么 |
+|---|---|---|
+| 当成品用 | `github:qq540491950/dsh-effort-picker#v0.0.2`（完整写法 `git+https://github.com/qq540491950/dsh-effort-picker.git#v0.0.2` 也行） | profile 里的**拷贝**；钉住 tag，改代码要 bump 版本 + 打新 tag 再装 |
+| 开发迭代 | `D:\project\dsh-plugins\dsh-effort-picker`（绝对路径） | profile 里的 **junction**；`npm run build` 之后 HMR 立刻看到新产物 |
 
-看返回里的 `application` 是否为 `applied`；界面若没变化，按 `Ctrl+R` 刷新一次。
-装完可以用 `cordis_inspect_query`（Client · `Slots.listSubTree`，root = `conversation.input.model`）
-确认台账里多了一条 `priority -1` 的 occupant。
+在 GUI 里就是 **设置 → 插件 → 安装**，把上面那串粘进去；同样的事也可以由 `plugin_manager` 的
+`install_bundle`（`target` 传这一串）完成。安装器先 `inspect` 再装，**识别出的 spec 形态**只有四类：
+registry 名、绝对路径、git 地址、tarball。
+
+看返回里的 `application` 是否为 `applied`；界面若没变化，按 `Ctrl+R` 刷新一次。装完可以用
+`cordis_inspect_query`（Client · `Slots.listSubTree`，root = `conversation.input.model`）确认台账里
+多了一条 `priority -1` 的 occupant。
+
+> 只有发布到 npm 之后才能直接填包名（`dsh-effort-picker` / `dsh-effort-picker@0.0.2`）；
+> 现在 `"private": true` 且未发布，所以要用 git 地址或 tarball。
+
+#### 两个必须知道的坑
+
+1. **`file` 字段别删**。git / tarball 安装会打包整个仓库，`"files": ["lib", "cordis.patch.yml", "README.md"]`
+   把它收成"产物 + 补丁层 + 说明"；少了 `cordis.patch.yml` 会被判 `not-bundle` 而回滚。
+2. **从本地目录切到 URL 安装时，先清掉 junction**：`install_bundle` 装目录会把
+   `profile/node_modules/dsh-effort-picker` 做成指向仓库的 junction，`remove_bundle` 之后它**可能还留着**；
+   接着装 URL 版时 pnpm 会试着把整个开发目录（含 `node_modules` 里的符号链接）导入 store，报
+   `ERR_PNPM_EPERM ... symlink`。删掉残留即可（`rmdir` 删的是 junction，不会动仓库）：
+
+   ```powershell
+   cmd /c rmdir "C:\Users\admin\.dsh\profiles\desktop\node_modules\dsh-effort-picker"
+   ```
+
+（安装失败时安装器会把 profile 的 `package.json` / `pnpm-lock.yaml` 回滚到安装前——实测过，不会留半成品。）
 
 ### 备选：profile 里手写一行（老办法）
 

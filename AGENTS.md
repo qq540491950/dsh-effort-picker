@@ -176,9 +176,22 @@ bundle → Host 在 `/plugins` 下发布并写进浏览器 boot graph。
 
 profile 是**用户的环境**，不是本仓库的一部分：`C:\Users\admin\.dsh\profiles\desktop\cordis.patch.yml`。
 
-**首选**：用 `plugin_manager` 的 `install_bundle`（target = 本仓库绝对目录）。profile 的
+**首选**：用 `plugin_manager` 的 `install_bundle`（GUI 里是「设置 → 插件 → 安装」，填同一串）。profile 的
 `package.json` 依赖、`dsh.profile.bundles` 以及 Loader 行都由安装器写——本仓库只提供
-`cordis.patch.yml` 那一层，不碰用户的其它配置。
+`cordis.patch.yml` 那一层，不碰用户的其它配置。spec 有两种形态，装的是同一个包：
+
+- `github:qq540491950/dsh-effort-picker#v0.0.2`：**成品形态**，钉 tag，profile 里是拷贝；
+- `D:\project\dsh-plugins\dsh-effort-picker`：**开发形态**，profile 里是 junction，`npm run build` 即刻生效。
+
+两条纪律：
+
+- **改完要发布成新版本**：bump `package.json` 的 `version` → 提交 → `git tag -a vX.Y.Z` → 推 tag。
+  同一 tag 的产物不会变（也不该变）；不 bump 版本就重打 tag 只会让人分不清装的是哪份。
+- **`"files"` 不能删**：git / tarball 安装按它打包，`cordis.patch.yml` 不在里面会被判 `not-bundle`。
+- **本地目录 ↔ URL 互换时先清 junction**：`remove_bundle` 可能留下
+  `profile/node_modules/dsh-effort-picker` 这个指向仓库的 junction，再装 URL 版时 pnpm 会把整个开发目录
+  （含 `node_modules` 的符号链接）往 store 里导入，报 `ERR_PNPM_EPERM ... symlink`。用
+  `cmd /c rmdir "<profile>\node_modules\dsh-effort-picker"` 清掉（删的是 junction，不动仓库）。
 
 **备选**（手写行）时：在 profile 补丁层里**只允许增删 `id: dsh-effort-picker` 这一个 insert 行**——
 其它条目的配置（模型、推理强度、搜索 provider、MCP、密钥）都不属于本任务范围，不要"顺手"改。
