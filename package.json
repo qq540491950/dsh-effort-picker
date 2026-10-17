@@ -5,6 +5,11 @@
   "description": "DSH Web 客户端插件：把 composer 的思考模式（reasoning effort）换成 Codex 风格的渐变滑杆。TypeScript 源码 + esbuild 产物。",
   "type": "module",
   "main": "lib/index.js",
+  "files": [
+    "lib",
+    "cordis.patch.yml",
+    "README.md"
+  ],
   "exports": {
     ".": "./lib/index.js",
     "./client": "./lib/client.js",
