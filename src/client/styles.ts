@@ -191,28 +191,26 @@ export const styles = {
 	},
 	/** 拖动中的圆钮：只把内侧描边加深一点（`track.tsx` 按 `dragging` 切），不做光晕。 */
 	thumbActive: { boxShadow: 'inset 0 0 0 1px rgba(0, 0, 0, .18)' },
-	// 一个 provider 分组：一条通栏分节条 + 该 provider 的模型行。
-	// **组容器本身仍然不是卡片**——没有底色、边框、圆角；底色只出现在 groupHead 这条
-	// 通栏色带上（左右各 -12px 抵消面板 padding，直角、无边框）。早先被撤掉的是
-	// provider 圆角卡片（border-l3 + radius + 掺色底），别把整组重新做回卡片。
-	group: { display: 'flex', flexDirection: 'column', gap: '2px', marginTop: '8px' },
-	// 分组条（provider）：全宽、吸顶。224px 的面板里只靠一行浅色小字分组不够
-	// （实测反馈两次「分组不明显」），所以升级成真正的分节头条带：
-	//   · 横向用负 margin 吃掉面板 12px padding，视觉上从一边到另一边；
-	//   · 底色 = 菜单面同色（bg-layer-2）掺 6% label-primary，滚动时能盖住下方行；
-	//   · 直角、无边框，不构成卡片。
+	// 一个 provider 分组：一个**有边框的框**（用户 2026-10-24 明确要求「分组使用框包起来」）。
+	// 早先撤掉的是「每行一张 provider 卡片」；现在保留的是「每个 provider 一个框」：
+	// 框内模型行仍然平铺，只在组这一层有 1px 边框 + 8px 圆角 + 3% 底色。
+	group: {
+		display: 'flex',
+		flexDirection: 'column',
+		marginTop: '8px',
+		border: '1px solid color-mix(in srgb, var(--dsw-alias-label-primary) 10%, transparent)',
+		borderRadius: '8px',
+		background: 'color-mix(in srgb, var(--dsw-alias-label-primary) 3%, transparent)',
+		overflow: 'hidden',
+	},
+	// 框头：组名 + 数量。底色比框内再深 1%，底边一条分隔线。
 	groupHead: {
-		position: 'sticky',
-		top: 0,
-		zIndex: 2,
 		display: 'flex',
 		alignItems: 'center',
 		gap: '8px',
-		margin: '0 -12px',
-		padding: '5px 20px',
-		background: 'color-mix(in srgb, var(--dsw-alias-label-primary) 6%, var(--dsw-alias-bg-layer-2))',
-		borderTop: '1px solid color-mix(in srgb, var(--dsw-alias-label-primary) 6%, transparent)',
-		borderBottom: '1px solid color-mix(in srgb, var(--dsw-alias-label-primary) 6%, transparent)',
+		padding: '6px 8px',
+		background: 'color-mix(in srgb, var(--dsw-alias-label-primary) 4%, transparent)',
+		borderBottom: '1px solid color-mix(in srgb, var(--dsw-alias-label-primary) 7%, transparent)',
 		userSelect: 'none',
 	},
 	// 组名文字：flex 子项自己负责省略号（条本身不能 overflow:hidden，否则会裁掉吸顶内容）。
@@ -238,9 +236,8 @@ export const styles = {
 		lineHeight: '16px',
 		fontVariantNumeric: 'tabular-nums',
 	},
-	// 组内每一行是 Codex 式的**两行行项目**：模型名 + 一行说明（当前/选中后 档位）。
-	// 把档位从行尾挪进副行后，224px 下模型名不再被 High/Max 挤成省略号；
-	// provider 归吸顶分节条负责，副行不再重复它（长 provider 名会把档位截掉）。
+	// 组内每一行是单行：模型名 + 档位 + 勾（用户要求把思考强度放到模型后边，压缩高度）。
+	// 行在框内，圆角交给 group 的 overflow:hidden，行本身保持直角，hover 才能铺满整行。
 	rowButton: {
 		display: 'flex',
 		alignItems: 'center',
@@ -248,7 +245,7 @@ export const styles = {
 		width: '100%',
 		padding: '6px 8px',
 		border: 'none',
-		borderRadius: '6px',
+		borderRadius: 0,
 		background: 'transparent',
 		color: 'var(--dsw-alias-label-primary)',
 		font: 'inherit',
@@ -256,17 +253,12 @@ export const styles = {
 		cursor: 'pointer',
 		transition: 'background .1s ease',
 	},
-	// 行的两行主体：主行（模型名）+ 副行（provider · 当前/选中后 档位）。
-	rowBody: { display: 'flex', flexDirection: 'column', gap: '1px', flex: 1, minWidth: 0 },
-	// 副行：11px/14，tertiary。没有档位的模型写「无档位」（不撒谎）。
-	rowDesc: {
-		minWidth: 0,
-		overflow: 'hidden',
-		whiteSpace: 'nowrap',
-		textOverflow: 'ellipsis',
-		color: 'var(--dsw-alias-label-tertiary)',
-		fontSize: '11px',
-		lineHeight: '14px',
+	// 行尾档位：比模型名浅一号，紧跟在模型名后面，不再单独占一整行。
+	rowEffort: {
+		flex: 'none',
+		color: 'var(--dsw-alias-label-secondary)',
+		fontSize: '12px',
+		lineHeight: '18px',
 	},
 	// 半透明菜单面上不要用 bg-layer-2（和面板几乎同色，看不出 hover）。
 	rowHover: { background: 'color-mix(in srgb, var(--dsw-alias-label-primary) 7%, transparent)' },
@@ -281,23 +273,14 @@ export const styles = {
 		gap: '2px',
 		maxHeight: 'min(320px, 50vh)',
 		overflowY: 'auto',
-		// 列表滚动时不把滚动传给下面的对话列表；滚动条出现/消失时也不让面板宽度跳一格。
+		// 列表滚动时不把滚动传给下面的对话列表。滚动条整体隐藏（用户要求），
+		// Chromium 的 ::-webkit-scrollbar 由 SHAPE_CSS 里的兜底样式表负责。
 		overscrollBehavior: 'contain',
-		scrollbarGutter: 'stable',
-	},
-	// 模型超过 4 个时出现的搜索框；底色与 rowHover 同源，避免在菜单面上再引入一种材质。
-	search: {
-		width: '100%',
-		boxSizing: 'border-box',
-		padding: '6px 8px',
-		border: 'none',
-		borderRadius: '6px',
-		background: 'color-mix(in srgb, var(--dsw-alias-label-primary) 7%, transparent)',
-		color: 'var(--dsw-alias-label-primary)',
-		font: 'inherit',
-		fontSize: '12px',
+		scrollbarWidth: 'none',
+		msOverflowStyle: 'none',
 	},
 	modelName: {
+		flex: 1,
 		minWidth: 0,
 		overflow: 'hidden',
 		whiteSpace: 'nowrap',

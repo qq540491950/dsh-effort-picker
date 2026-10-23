@@ -1011,16 +1011,22 @@ check(
 	groupLabelStyle.includes('label-secondary') && groupLabelStyle.includes('fontWeight: 600'),
 	groupLabelStyle.replace(/\s+/g, ' ').trim(),
 );
-// 只靠一行浅色小字时三组会连成一片（实测反馈两次「分组不明显」），所以组名升级成
-// **通栏、吸顶的分节条**：左右负 margin 吃掉面板 padding，底色是菜单面掺 label-primary；
-// 仍然不是卡片——直角、无边框。
+// 组容器现在是**有边框的框**（用户 2026-10-24 要求「分组使用框包起来」）：
+// 只给组这一层 1px 边框 + 8px 圆角 + 3% 底色，框内模型行仍然平铺。
+const groupStyle = /(?<![A-Za-z])group:\s*\{([^{}]*)\}/.exec(clientSource)?.[1] ?? '';
+check(
+	'每个 provider 是一个框（1px 边框 + 8px 圆角 + 底色）',
+	groupStyle.includes('flexDirection') &&
+		groupStyle.includes('border:') &&
+		groupStyle.includes('borderRadius: "8px"') &&
+		groupStyle.includes('background'),
+	groupStyle.replace(/\s+/g, ' ').trim(),
+);
+// 框头与框内之间的分隔线。
 const groupHeadStyle = /groupHead:\s*\{([^{}]*)\}/.exec(clientSource)?.[1] ?? '';
 check(
-	'分组条是通栏吸顶色带（无圆角，不是卡片）',
-	groupHeadStyle.includes('sticky') &&
-		groupHeadStyle.includes('margin: "0 -12px"') &&
-		groupHeadStyle.includes('background') &&
-		!groupHeadStyle.includes('borderRadius'),
+	'框头有底部分隔线',
+	groupHeadStyle.includes('borderBottom') && groupHeadStyle.includes('padding'),
 	groupHeadStyle.replace(/\s+/g, ' ').trim(),
 );
 // 组内模型数：两组都必须等于组里的行数，不能写死。
@@ -1030,22 +1036,17 @@ check(
 		groupCountText(groupNodes[1]) === String(rowsIn(groupNodes[1]).length),
 	`${groupCountText(groupNodes[0])}/${String(rowsIn(groupNodes[0]).length)} | ${groupCountText(groupNodes[1])}/${String(rowsIn(groupNodes[1]).length)}`,
 );
-// 每行是 Codex 式两行：主行模型名 + 副行「当前/选中后 档位」。
-// provider 由吸顶分节条负责（行内 aria-label 仍然带着，见下面的断言）。
-const rowTexts = modelRows.map((row) => textOf(row));
+// 搜索框按用户要求移除；模型行仍可用上下键 / Home / End 导航（交互测试覆盖）。
 check(
-	'每行副标题带当前/选中后态',
-	rowTexts[0].includes('当前') &&
-		rowTexts[1].includes('选中后') &&
-		rowTexts[3].includes('选中后'),
-	rowTexts.join(' | '),
+	'模型列表不再渲染搜索框',
+	findAll(modelTree, (node) => node.type === 'input').length === 0,
+	String(findAll(modelTree, (node) => node.type === 'input').length),
 );
-// 组名只做分隔，不做卡片：组容器没有边框、没有底色、没有圆角。
-const groupStyle = /(?<![A-Za-z])group:\s*\{([^{}]*)\}/.exec(clientSource)?.[1] ?? '';
+// 列表滚动条隐藏：inline 的 scrollbar-width + SHAPE_CSS 里的 ::-webkit-scrollbar。
 check(
-	'组容器不是卡片（无 border / 底色 / 圆角）',
-	groupStyle.includes('flexDirection') && !/(border|background|borderRadius)/.test(groupStyle),
-	groupStyle.replace(/\s+/g, ' ').trim(),
+	'列表隐藏滚动条（scrollbar-width + ::-webkit-scrollbar）',
+	clientSource.includes('scrollbarWidth') && String(clientExports.SHAPE_CSS).includes('::-webkit-scrollbar'),
+	String(clientExports.SHAPE_CSS),
 );
 const rowLabels = modelRows.map((row) => String(row.props.ariaLabel));
 check(

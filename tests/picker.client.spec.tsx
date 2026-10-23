@@ -107,7 +107,7 @@ describe('CodexEffortPicker interaction', () => {
 		expect(screen.getByRole('button', { name: /选择模型，当前/ })).toHaveFocus();
 	});
 
-	it('模型超过 4 个时显示搜索，筛完后回车提交', async () => {
+	it('模型多时不再显示搜索，Home/End 仍可导航并提交', async () => {
 		const user = userEvent.setup();
 		const directory = createModelDirectory(snapshot({
 			current: { provider: 'many', model: 'm-1' },
@@ -125,13 +125,13 @@ describe('CodexEffortPicker interaction', () => {
 		await user.tab();
 		await user.keyboard('{Enter}');
 
-		const search = screen.getByRole('searchbox', { name: '搜索模型' });
-		expect(search).toHaveFocus();
-		await user.type(search, 'Model 5');
-		expect(screen.queryByRole('menuitemradio', { name: /Model 1/ })).not.toBeInTheDocument();
-		const filtered = screen.getByRole('menuitemradio', { name: /Model 5/ });
-		await user.keyboard('{ArrowDown}');
-		expect(filtered).toHaveFocus();
+		expect(screen.queryByRole('searchbox')).not.toBeInTheDocument();
+		expect(screen.getAllByRole('menuitemradio')).toHaveLength(5);
+		expect(screen.getByRole('menuitemradio', { name: /Model 1/ })).toHaveFocus();
+
+		await user.keyboard('{End}');
+		const last = screen.getByRole('menuitemradio', { name: /Model 5/ });
+		expect(last).toHaveFocus();
 		await user.keyboard('{Enter}');
 		await waitFor(() => {
 			expect(directory.select).toHaveBeenCalledWith({ provider: 'many', model: 'm-5' });

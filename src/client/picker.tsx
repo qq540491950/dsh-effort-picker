@@ -70,7 +70,6 @@ function CodexEffortPickerSeat(props: SeatProps) {
 
 	const [open, setOpen] = react.useState(false);
 	const [pane, setPane] = react.useState<Pane>('root');
-	const [query, setQuery] = react.useState('');
 	const [menuPos, setMenuPos] = react.useState<PanelPoint | null>(null);
 	const [dragRatio, setDragRatio] = react.useState<number | null>(null);
 	const [failure, setFailure] = react.useState<string | null>(null);
@@ -82,7 +81,6 @@ function CodexEffortPickerSeat(props: SeatProps) {
 	const triggerRef = react.useRef<HTMLButtonElement>(null);
 	const menuRef = react.useRef<HTMLElement>(null);
 	const modelButtonRef = react.useRef<HTMLButtonElement>(null);
-	const searchRef = react.useRef<HTMLInputElement>(null);
 	const listRef = react.useRef<HTMLDivElement>(null);
 	const trackRef = react.useRef<HTMLDivElement>(null);
 	const thumbRef = react.useRef<HTMLSpanElement>(null);
@@ -102,19 +100,6 @@ function CodexEffortPickerSeat(props: SeatProps) {
 	const efforts = reasoning?.efforts ?? [];
 	const groups = state.groups.filter((group) => group.models.length > 0);
 	const failures = state.failures ?? [];
-	const totalModels = groups.reduce((sum, group) => sum + group.models.length, 0);
-	// 与官方一致的阈值：模型超过 4 个才显示搜索，避免小目录多一个控件。
-	const showSearch = totalModels > 4;
-	const normalizedQuery = query.trim().toLowerCase();
-	const filteredGroups = normalizedQuery === ''
-		? groups
-		: groups
-				.map((group) => ({
-					...group,
-					models: group.models.filter((model) =>
-						(model.name ?? model.id).toLowerCase().includes(normalizedQuery)),
-				}))
-				.filter((group) => group.models.length > 0);
 	const effectiveEffort = current?.reasoningEffort ?? reasoning?.defaultEffort;
 	const activeIndex = efforts.findIndex((level) => level.id === effectiveEffort);
 	/**
@@ -238,16 +223,12 @@ function CodexEffortPickerSeat(props: SeatProps) {
 	// 进入模型列表时把焦点落到当前行（或第一行）；返回根面板由 backToRoot() 负责。
 	react.useEffect(() => {
 		if (!open || pane !== 'model') return undefined;
-		if (showSearch) {
-			searchRef.current?.focus();
-			return undefined;
-		}
 		const checked = listRef.current?.querySelector<HTMLElement>(
 			'[role="menuitemradio"][aria-checked="true"]:not([disabled])',
 		) ?? null;
 		(checked ?? modelChoices()[0] ?? modelRows()[0])?.focus();
 		return undefined;
-	}, [open, pane, showSearch]);
+	}, [open, pane]);
 
 	// available === false 出现在被寻址的子代理会话上：与官方一致，什么都不渲染。
 	if (!available) return null;
@@ -260,7 +241,6 @@ function CodexEffortPickerSeat(props: SeatProps) {
 		triggerRef.current?.focus();
 		setFailure(null);
 		setDragRatio(null);
-		setQuery('');
 		setPane('root');
 		setOpen(true);
 		load();
@@ -413,20 +393,10 @@ function CodexEffortPickerSeat(props: SeatProps) {
 				else close(true);
 				return;
 			}
-			if (active === searchRef.current) {
-				(modelChoices()[0] ?? modelRows()[0])?.focus();
-				return;
-			}
 			moveTab(1);
 			return;
 		}
 		if (event.key === undefined) return;
-		if (active === searchRef.current && (event.key === 'ArrowDown' || event.key === 'ArrowUp')) {
-			event.preventDefault();
-			const choices = modelChoices();
-			(event.key === 'ArrowDown' ? choices[0] : choices[choices.length - 1])?.focus();
-			return;
-		}
 		const inList = listRef.current !== null && active !== null && listRef.current.contains(active);
 		if (inList && (event.key === 'ArrowDown' || event.key === 'ArrowUp')) {
 			event.preventDefault();
@@ -578,10 +548,7 @@ function CodexEffortPickerSeat(props: SeatProps) {
 								title={modelLabel}
 								disabled={controlsLocked}
 								style={modelLineStyle}
-								onClick={() => {
-									setQuery('');
-									setPane('model');
-								}}
+								onClick={() => setPane('model')}
 								{...modelHoverHandlers}
 							>
 								<span style={styles.headerModelText}>{modelLabel}</span>
@@ -614,25 +581,13 @@ function CodexEffortPickerSeat(props: SeatProps) {
 
 						{/* 模型列表（下钻时） */}
 						{pane === 'model' ? (
-							<div style={styles.list}>
-								{showSearch ? (
-									<input
-										ref={searchRef}
-										type="search"
-										aria-label="搜索模型"
-										aria-controls={`${id}-models`}
-										placeholder="搜索模型…"
-										value={query}
-										onChange={(event) => setQuery(event.target.value)}
-										style={styles.search}
-									/>
-								) : null}
+							<div style={styles.list} data-dsh-effort-picker-list>
 								<div ref={listRef} id={`${id}-models`} role="menu" aria-label="模型列表">
 									<Row role="menuitem" onClick={backToRoot}>
 										<primitives.IconChevronLeftOutlineRegular size={14} style={styles.chevron} />
 										<span style={styles.caption}>返回</span>
 									</Row>
-									{filteredGroups.map((group) => (
+									{groups.map((group) => (
 										<div
 											key={group.id}
 											role="group"
@@ -679,10 +634,9 @@ function CodexEffortPickerSeat(props: SeatProps) {
 														? `${effortName}（默认）`
 														: effortName;
 												const providerName = group.name ?? group.id;
-												// 副行只说"这一行现在/选中后会怎样"。provider 由吸顶分节条负责，
-												// 不再重复写进每一行——长 provider 名 + 档位在 224px 下会把档位截掉
-												// （实测：「DeepSeek 官方 · 选中后 Max」最后只剩省略号）。
-												const description = effortLabel === undefined
+												// 行内只显示档位名（用户要求把思考强度放到模型后边）；
+												// 读屏整句补上「当前/选中后」，不依赖视觉位置表达状态。
+												const effortState = effortLabel === undefined
 													? '无档位'
 													: `${isCurrent ? '当前' : '选中后'} ${effortLabel}`;
 												return (
@@ -693,14 +647,14 @@ function CodexEffortPickerSeat(props: SeatProps) {
 														disabled={controlsLocked}
 														// 读屏按行的顺序念，不依赖"组标题被念过"；provider 仍写进整句，
 														// 同名模型来自不同 provider 时也分得清。
-														ariaLabel={`${model.name ?? model.id}，${providerName}，${description}`}
+														ariaLabel={`${model.name ?? model.id}，${providerName}，${effortState}`}
 														title={levels.length === 0 ? undefined : `${String(levels.length)} 档可选`}
 														onClick={() => chooseModel(group, model)}
 													>
-														<span style={styles.rowBody}>
-															<span style={styles.modelName}>{model.name ?? model.id}</span>
-															<span style={styles.rowDesc}>{description}</span>
-														</span>
+														<span style={styles.modelName}>{model.name ?? model.id}</span>
+														{effortName === undefined ? null : (
+															<span style={styles.rowEffort}>{effortName}</span>
+														)}
 														<span style={styles.slot}>
 															{isPending ? (
 																<primitives.StateDot state="ongoing" />
@@ -714,13 +668,9 @@ function CodexEffortPickerSeat(props: SeatProps) {
 										</div>
 									))}
 								</div>
-								{filteredGroups.length === 0 && failures.length === 0 ? (
+								{groups.length === 0 && failures.length === 0 ? (
 									<div style={styles.notice} role="status">
-										{normalizedQuery !== ''
-											? '没有匹配的模型'
-											: state.status === 'loading'
-												? '正在载入模型…'
-												: '暂无可用模型'}
+										{state.status === 'loading' ? '正在载入模型…' : '暂无可用模型'}
 									</div>
 								) : null}
 								{failures.map((entry) => (

@@ -35,7 +35,7 @@
 | `←` / `→` | 降/升一档并提交（焦点在触发器上即可，不必先点面板） |
 | `Home` / `End` | 跳到最低/最高档 |
 | `Esc` | 退回上一层；已在根层则关闭面板 |
-| 点击标题下方的模型名（带 ›） | 下钻到模型列表：**按 provider 分节**，每组一条通栏分节条（`cpa` / `huawei` / 官方 provider…，带组内模型数，滚动时吸顶），组内是 Codex 式两行行：模型名 + `当前/选中后 档位`，行尾是勾；当前模型显示**正在用的档位**，其它模型显示**选中它会带上的档位**（= 该模型的最高档），选中后带上该模型的最高档 |
+| 点击标题下方的模型名（带 ›） | 下钻到模型列表：**按 provider 分框**，每个 provider 一个框（带组内模型数），框内是单行模型（模型名 + 档位 + 勾，档位紧跟在模型名后边）；当前模型显示**正在用的档位**，其它模型显示**选中它会带上的档位**（= 该模型的最高档），选中后带上该模型的最高档。不提供搜索框，列表滚动条隐藏 |
 | 点击面板外 | 关闭 |
 
 档位数是**自适应**的：直接取当前模型 `reasoning.efforts` 的长度。本机
@@ -66,7 +66,7 @@
 
 | 场景 | 填什么 | 装完是什么 |
 |---|---|---|
-| 当成品用 | `github:qq540491950/dsh-effort-picker#v0.0.7`（完整写法 `git+https://github.com/qq540491950/dsh-effort-picker.git#v0.0.7` 也行） | profile 里的**拷贝**；钉住 tag，改代码要 bump 版本 + 打新 tag 再装。tag 必须与 `package.json` 的 `version` 一致（当前 `0.0.7`） |
+| 当成品用 | `github:qq540491950/dsh-effort-picker#v0.0.8`（完整写法 `git+https://github.com/qq540491950/dsh-effort-picker.git#v0.0.8` 也行） | profile 里的**拷贝**；钉住 tag，改代码要 bump 版本 + 打新 tag 再装。tag 必须与 `package.json` 的 `version` 一致（当前 `0.0.8`） |
 | 开发迭代 | `D:\project\dsh-plugins\dsh-effort-picker`（绝对路径） | profile 里的 **junction**；`npm run build` 之后 HMR 立刻看到新产物 |
 
 在 GUI 里是**侧栏「插件」→「添加插件」**（主按钮直接打开安装对话框；箭头里的「安装第三方插件」打开同一个框），
@@ -77,7 +77,7 @@
 装完界面若没变化，按 `Ctrl+R` 刷新一次。想确认台账里有没有生效，用 `cordis_inspect_query`
 （Client · `Slots.listSubTree`，root = `conversation.input.model`）看是否多了一条 `priority -1` 的 occupant。
 
-> 只有发布到 npm 之后才能直接填包名（`dsh-effort-picker` / `dsh-effort-picker@0.0.7`）；
+> 只有发布到 npm 之后才能直接填包名（`dsh-effort-picker` / `dsh-effort-picker@0.0.8`）；
 > 现在 `"private": true` 且未发布，所以要用 git 地址、绝对路径或 tarball。
 
 #### 两个必须知道的坑
@@ -150,10 +150,10 @@ node D:\project\dsh-plugins\dsh-effort-picker\tools\verify.ts `
 都算通过；`--yaml` 可选，用真实 YAML 解析器校验该 patch 能解析。不带 `--patch` 时只有第 12b 组跳过。）
 
 自检是纯 Node、零依赖的离线程序（本身也是 TS，靠 Node 原生类型剥离直接跑）：用 `node:vm` 跑
-**真实的** `lib/client.js`，喂一个极简 React 替身与假 ctx，覆盖 16 组共 127 条断言（带 `--patch` 时
-129 条）。它守的是投递契约、注入清单、数据换算和视觉不变量；交互行为另由
+**真实的** `lib/client.js`，喂一个极简 React 替身与假 ctx，覆盖 16 组共 128 条断言（带 `--patch` 时
+130 条）。它守的是投递契约、注入清单、数据换算和视觉不变量；交互行为另由
 `tests/picker.client.spec.tsx` 的 10 条 Vitest + jsdom 用例覆盖（焦点、Tab/Shift+Tab、Esc、pending、
-拖拽取消、搜索、空态/失败态）。全部通过时打印 `全部通过 ✓` 并以 0 退出。
+拖拽取消、键盘导航、空态/失败态）。全部通过时打印 `全部通过 ✓` 并以 0 退出。
 
 ## 出问题时
 
@@ -167,19 +167,18 @@ node D:\project\dsh-plugins\dsh-effort-picker\tools\verify.ts `
 
 ## 已知取舍
 
-- **未做 provider 排序**：模型列表按 provider 分节（分节条可见），超过 4 个模型时提供按名称过滤的
-  搜索框；但不做 provider 排序（官方把 DeepSeek Account 排在最前）。搜索只匹配模型名，不做前缀/模糊评分，
-  `/model` 命令弹窗仍是完整功能的那一个。
+- **未做 provider 排序**：模型列表按 provider 分框，不做 provider 排序（官方把 DeepSeek Account 排在最前）。
+  不提供搜索框（用户要求），模型多时用上下键 / Home / End 导航；`/model` 命令弹窗仍是完整功能的那一个。
 - **文案硬编码中文**：没有注册 locale 命名空间（避免多一处失败面）。
-- **模型列表按 provider 分节、组内两行行**：每组一条**通栏分节条**（`group.name ?? group.id`，
-  11px / 600 `label-secondary`，右侧组内模型数；`groupHead` 吸顶、左右 -12px 通栏、
-  `bg-layer-2` 掺 6% `label-primary` 的色带、直角无边框），组内每行是 Codex 式的
-  「模型名 + `当前/选中后 档位` + 勾」；当前行用 `color-mix(label-primary 11%, transparent)` 底色 + 行尾勾标出来。
-  分节是为了回答"这个模型是谁家的"——用户配置的第三方路由（cpa / huawei / tengxun…）和官方
-  provider 的模型混在同一个列表里，只有 `aria-label` 的时候肉眼分不出（实测反馈两次：分组不明显）。
-  **没有模型的 provider 不渲染空分节条**；`aria-label` 照旧带 provider（"模型名，provider，当前/选中后 档位"），
-  读屏不依赖"组标题被念过"。早先那版 provider **圆角卡片**（border-l3 + radius + 掺色底）已经被撤掉，
-  现在是通栏直角分节条 + 两行行；**别把整组做回卡片**（AGENTS.md 第 3 节也钉了这条）。
+- **模型列表按 provider 分框、框内平铺**：每个 provider 一个框（1px 边框 + 8px 圆角 + 3% 底色），
+  框头是 `group.name ?? group.id`（11px / 600 `label-secondary`，右侧组内模型数，带底部分隔线），
+  框内每行是「模型名 + 档位 + 勾」，档位紧跟在模型名后边（当前模型显示正在用的档位，其它模型显示
+  选中后会带上的最高档）；当前行用 `color-mix(label-primary 11%, transparent)` 底色 + 行尾勾标出来。
+  分框是为了回答"这个模型是谁家的"——用户配置的第三方路由（cpa / huawei / tengxun…）和官方
+  provider 的模型混在同一个列表里，只有 `aria-label` 的时候肉眼分不出。**没有模型的 provider 不渲染空框**；
+  `aria-label` 照旧带 provider（"模型名，provider，当前/选中后 档位"），读屏不依赖"组标题被念过"。
+  **搜索框已移除，列表滚动条隐藏**（用户 2026-10-24 要求）；模型多时用上下键 / Home / End 导航。
+  早先撤掉的是「每行一张 provider 圆角卡片」，别把行做成卡片（AGENTS.md 第 3 节也钉了这条）。
 - **切模型带上该模型的最高档**（不是路由默认档，也不是"不带档位"）：
   - 不带档位会把会话档位**清空**，选择器随即没有滑块头（`activeIndex = -1` → 轨道不渲染
     thumb / fill），看起来就是"滑块不行"；
