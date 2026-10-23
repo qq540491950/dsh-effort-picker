@@ -642,9 +642,16 @@ function CodexEffortPickerSeat(props: SeatProps) {
 											{/* 组名（provider）可见：用户配置的第三方路由（cpa / huawei / tengxun…）
 											    与官方 provider 的模型混在同一个列表里，没有这一行就分不出"这个模型是
 											    谁家的"（实测反馈）。它只是标题行，不是可选行；`role="group"` 上的
-											    aria-label 已经念过同一个名字，所以视觉标题对读屏隐藏，避免重复播报。 */}
-											<div style={styles.groupLabel} aria-hidden="true">
-												{group.name ?? group.id}
+											    aria-label 已经念过同一个名字，所以视觉标题（含右侧的模型数）对读屏隐藏，
+											    避免重复播报。细线与模型数是"分组"的主要视觉信号，不是装饰。 */}
+											<div style={styles.groupLabel}>
+												<span style={styles.groupLabelText} aria-hidden="true">
+													{group.name ?? group.id}
+												</span>
+												<span style={styles.groupRule} aria-hidden="true" />
+												<span style={styles.groupCount} aria-hidden="true">
+													{String(group.models.length)}
+												</span>
 											</div>
 											{group.models.map((model) => {
 												const isCurrent = current?.provider === group.id && current?.model === model.id;

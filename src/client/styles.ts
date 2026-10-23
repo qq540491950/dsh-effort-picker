@@ -198,18 +198,46 @@ export const styles = {
 	group: { display: 'flex', flexDirection: 'column', gap: '2px' },
 	// 组名（provider）：用户配置的第三方路由与官方 provider 的模型混在一个列表里，
 	// 只靠 aria-label 时肉眼分不出"这个模型是谁家的"（实测反馈：分组要加回来）。
-	// 比模型行（label-primary）浅两档、字号小一号、加一点字距，只做分隔不抢戏。
+	//
+	// 它不是卡片标题，而是**分节标题**：比模型行浅一档（label-secondary）、加字重与字距，
+	// 右侧一条 1px 细线吃掉剩余宽度，末端跟组内模型数。留白（上 12px / 下 4px）与细线
+	// 才是"分组"的主要信号——只有一行浅色小字时，三组会连成一片（实测反馈：分组不明显）。
+	// 上内边距刻意大于下内边距：上一组末行 → 组名 = 14px，组名 → 本组首行 = 6px。
 	groupLabel: {
-		padding: '6px 8px 2px',
-		color: 'var(--dsw-alias-label-tertiary)',
-		fontSize: '11px',
-		fontWeight: 500,
-		letterSpacing: '0.02em',
+		display: 'flex',
+		alignItems: 'center',
+		gap: '8px',
+		padding: '12px 8px 4px',
 		lineHeight: '16px',
+		userSelect: 'none',
+	},
+	// 组名文字：flex 子项自己负责省略号（容器不能 overflow:hidden，否则会把细线一起裁掉）。
+	groupLabelText: {
+		minWidth: 0,
 		overflow: 'hidden',
 		whiteSpace: 'nowrap',
 		textOverflow: 'ellipsis',
-		userSelect: 'none',
+		color: 'var(--dsw-alias-label-secondary)',
+		fontSize: '11px',
+		fontWeight: 600,
+		letterSpacing: '0.03em',
+	},
+	// 组名右侧的拉伸细线：掺 label-primary 而不是裸 bg-layer，
+	// 否则在深色主题里与菜单面同色（轨道那条踩过同样的坑）。
+	groupRule: {
+		flex: 1,
+		height: '1px',
+		background: 'color-mix(in srgb, var(--dsw-alias-label-primary) 12%, transparent)',
+	},
+	// 组内模型数：退回 tertiary，不和组名抢；tabular-nums 让各组的数字右端对齐。
+	groupCount: {
+		flex: 'none',
+		color: 'var(--dsw-alias-label-tertiary)',
+		fontSize: '10px',
+		fontWeight: 400,
+		letterSpacing: '0',
+		lineHeight: '16px',
+		fontVariantNumeric: 'tabular-nums',
 	},
 	// 组内每一行仍是**平铺**的（无卡片）：视觉上只留"模型名 + 档位 + 勾"。
 	rowButton: {

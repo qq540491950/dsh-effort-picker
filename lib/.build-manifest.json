@@ -1,22 +1,22 @@
 {
   "name": "dsh-effort-picker",
   "tool": "esbuild@0.28.2",
-  "sourceTree": "42c3e7bf462a5353a074c49fa09aed74e94cfd4926208c13a63c6593cbff8a1b",
+  "sourceTree": "bd9500242752caf6a85919a9979edbd88024fdb80f2bd3b1032d944ce03626f7",
   "targets": [
     {
       "output": "lib/client.js",
-      "outputSha256": "b5e001035072cbe1521aa20648e5923b1081878ae4b6c35ae052f6229bdc091c",
+      "outputSha256": "d6dbc349e822cf7b5656b62b117ef1543f2c1134e039934f7d05da81255afdf6",
       "inputs": {
         "src/client/boundary.tsx": "d9b8056065bc8f54ff198d840ce84c2936fef60eacd5e2d007d1285cea07e880",
         "src/client/dom.ts": "0707cc0378817268683dd819c6a6ed1449946ae1b26c4a920265499811df3c13",
         "src/client/geometry.ts": "1bd26685e5db5aaa344e2fadcccad09912b5938809daa60532876a8bf2fe8682",
         "src/client/hooks.ts": "83cccb2a6be3f7d472c6d8a5ce37b81309029df1ec2017fdf67529bc8a831177",
         "src/client/index.ts": "a16d3e3c00c2e52bd5f809aa7ce2c378aa76fa326889c942a2c338fde7891836",
-        "src/client/picker.tsx": "43038af918fc9572786dff1acb42d698e14403d91f456c0a4170f2852db9e3a1",
+        "src/client/picker.tsx": "b354066814d69bd08f4006b89516f52c07686f604ac45678249dc825e59d3ee8",
         "src/client/placement.ts": "e7b5a7ed7e9153db1a694276b868d648e2e853157597d5b2f9ae336cfc4a58d4",
         "src/client/platform.ts": "389db0269532b9e8329031238c9c547584da169bce4c3838632834a0e15431a0",
         "src/client/row.tsx": "38952504a209a4d9505819076214124f5d3cdff90ca430d1d63adae1146b34d8",
-        "src/client/styles.ts": "04919e29dc50b1ec7c6b290e108d9a5e2b59030ce1b7836a81fce5efe207c7c5",
+        "src/client/styles.ts": "aefdf1902fdf821325570a9feb9b6791196a41b3b4911ab62df42431e8a822e4",
         "src/client/track.tsx": "60fdfc339e226b2042c683f977cfdc4948a6b1dfe9af9da51fe4ab9615563b54"
       }
     },

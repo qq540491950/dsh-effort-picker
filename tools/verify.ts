@@ -989,9 +989,14 @@ check(
 	groupNodes.every((group) => group.type === 'div' && group.props.role !== 'menuitemradio'),
 	String(groupNodes.map((group) => String(group.type)).join(' | ')),
 );
-// 组名可见（视觉上真印出来），但比模型行浅：label-tertiary ↔ 模型行 label-primary。
-const groupLabelText = (group: FakeElement): string =>
-	findAll(group, (node) => node.props?.['aria-hidden'] === 'true')
+// 组名可见（视觉上真印出来），但比模型行浅：label-secondary ↔ 模型行 label-primary。
+// 组名那一行里还有两个 aria-hidden 的元素：右侧 1px 分隔线与组内模型数。
+const groupHiddenNodes = (group: FakeElement): FakeElement[] =>
+	findAll(group, (node) => node.props?.['aria-hidden'] === 'true');
+const groupLabelText = (group: FakeElement): string => textOf(groupHiddenNodes(group)[0] ?? null);
+const groupCountText = (group: FakeElement): string =>
+	groupHiddenNodes(group)
+		.slice(1)
 		.map((node) => textOf(node))
 		.join('');
 check('第一个组的组名印出来了（cpa）', groupLabelText(groupNodes[0]) === 'cpa', groupLabelText(groupNodes[0]));
@@ -1000,11 +1005,25 @@ check(
 	groupLabelText(groupNodes[1]) === 'DeepSeek 官方',
 	groupLabelText(groupNodes[1]),
 );
-const groupLabelStyle = /groupLabel:\s*\{([^{}]*)\}/.exec(clientSource)?.[1] ?? '';
+const groupLabelStyle = /groupLabelText:\s*\{([^{}]*)\}/.exec(clientSource)?.[1] ?? '';
 check(
-	'组名用 label-tertiary（比模型行浅一档）',
-	groupLabelStyle.includes('label-tertiary'),
+	'组名用 label-secondary（比模型行浅一档）且加粗',
+	groupLabelStyle.includes('label-secondary') && groupLabelStyle.includes('fontWeight: 600'),
 	groupLabelStyle.replace(/\s+/g, ' ').trim(),
+);
+// 只有一行浅色小字时三组会连成一片（实测反馈：分组不明显），所以组名右侧还要有分隔线。
+const groupRuleStyle = /groupRule:\s*\{([^{}]*)\}/.exec(clientSource)?.[1] ?? '';
+check(
+	'组名右侧有 1px 分隔线（掺 label-primary）',
+	groupRuleStyle.includes('1px') && groupRuleStyle.includes('label-primary'),
+	groupRuleStyle.replace(/\s+/g, ' ').trim(),
+);
+// 组内模型数：两组都必须等于组里的行数，不能写死。
+check(
+	'每组组名末尾显示组内模型数（与行数一致）',
+	groupCountText(groupNodes[0]) === String(rowsIn(groupNodes[0]).length) &&
+		groupCountText(groupNodes[1]) === String(rowsIn(groupNodes[1]).length),
+	`${groupCountText(groupNodes[0])}/${String(rowsIn(groupNodes[0]).length)} | ${groupCountText(groupNodes[1])}/${String(rowsIn(groupNodes[1]).length)}`,
 );
 // 组名只做分隔，不做卡片：组容器没有边框、没有底色、没有圆角。
 const groupStyle = /(?<![A-Za-z])group:\s*\{([^{}]*)\}/.exec(clientSource)?.[1] ?? '';
