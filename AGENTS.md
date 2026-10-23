@@ -180,11 +180,13 @@ id / name 与**本机实际路径**核对，所以**仓库搬家后要么重新�
 
 profile 是**用户的环境**，不是本仓库的一部分：`C:\Users\admin\.dsh\profiles\desktop\cordis.patch.yml`。
 
-**首选**：用 `plugin_manager` 的 `install_bundle`（GUI 里是「设置 → 插件 → 安装」，填同一串）。profile 的
+**首选**：用 `plugin_manager` 的 `install_bundle`（GUI 里是**侧栏「插件」→「添加插件」**，把同一串粘进
+包名输入框；设置里只有只读的内置插件列表）。profile 的
 `package.json` 依赖、`dsh.profile.bundles` 以及 Loader 行都由安装器写——本仓库只提供
 `cordis.patch.yml` 那一层，不碰用户的其它配置。spec 有两种形态，装的是同一个包：
 
-- `github:qq540491950/dsh-effort-picker#v0.0.2`：**成品形态**，钉 tag，profile 里是拷贝；
+- `github:qq540491950/dsh-effort-picker#v0.0.3`：**成品形态**，钉 tag（必须等于 `package.json` 的
+  `version`），profile 里是拷贝；
 - `D:\project\dsh-plugins\dsh-effort-picker`：**开发形态**，profile 里是 junction，`npm run build` 即刻生效。
 
 两条纪律：

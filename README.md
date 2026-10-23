@@ -66,19 +66,19 @@
 
 | 场景 | 填什么 | 装完是什么 |
 |---|---|---|
-| 当成品用 | `github:qq540491950/dsh-effort-picker#v0.0.2`（完整写法 `git+https://github.com/qq540491950/dsh-effort-picker.git#v0.0.2` 也行） | profile 里的**拷贝**；钉住 tag，改代码要 bump 版本 + 打新 tag 再装 |
+| 当成品用 | `github:qq540491950/dsh-effort-picker#v0.0.3`（完整写法 `git+https://github.com/qq540491950/dsh-effort-picker.git#v0.0.3` 也行） | profile 里的**拷贝**；钉住 tag，改代码要 bump 版本 + 打新 tag 再装。tag 必须与 `package.json` 的 `version` 一致（当前 `0.0.3`） |
 | 开发迭代 | `D:\project\dsh-plugins\dsh-effort-picker`（绝对路径） | profile 里的 **junction**；`npm run build` 之后 HMR 立刻看到新产物 |
 
-在 GUI 里就是 **设置 → 插件 → 安装**，把上面那串粘进去；同样的事也可以由 `plugin_manager` 的
-`install_bundle`（`target` 传这一串）完成。安装器先 `inspect` 再装，**识别出的 spec 形态**只有四类：
-registry 名、绝对路径、git 地址、tarball。
+在 GUI 里是**侧栏「插件」→「添加插件」**（主按钮直接打开安装对话框；箭头里的「安装第三方插件」打开同一个框），
+把上面那串粘进包名输入框、点「安装」；安装完成的画面再点**立即启用**（直接关掉对话框等于"装好但停用"）。
+同样的事也可以由 `plugin_manager` 的 `install_bundle`（`target` 传这一串）完成。安装器先 `inspect` 再装，
+**识别出的 spec 形态**只有四类：registry 名、绝对路径、git 地址、tarball。
 
-看返回里的 `application` 是否为 `applied`；界面若没变化，按 `Ctrl+R` 刷新一次。装完可以用
-`cordis_inspect_query`（Client · `Slots.listSubTree`，root = `conversation.input.model`）确认台账里
-多了一条 `priority -1` 的 occupant。
+装完界面若没变化，按 `Ctrl+R` 刷新一次。想确认台账里有没有生效，用 `cordis_inspect_query`
+（Client · `Slots.listSubTree`，root = `conversation.input.model`）看是否多了一条 `priority -1` 的 occupant。
 
-> 只有发布到 npm 之后才能直接填包名（`dsh-effort-picker` / `dsh-effort-picker@0.0.2`）；
-> 现在 `"private": true` 且未发布，所以要用 git 地址或 tarball。
+> 只有发布到 npm 之后才能直接填包名（`dsh-effort-picker` / `dsh-effort-picker@0.0.3`）；
+> 现在 `"private": true` 且未发布，所以要用 git 地址、绝对路径或 tarball。
 
 #### 两个必须知道的坑
 
@@ -114,7 +114,8 @@ registry 名、绝对路径、git 地址、tarball。
 
 ## 卸载 / 回滚
 
-- bundle 安装的：`plugin_manager` 里 `set_bundle` 关掉，或 `remove_bundle` 移除；
+- bundle 安装的：插件页里把该组合包**关掉**（卸载按钮则先确认再移除）；同一件事也可以由
+  `plugin_manager` 的 `set_bundle` / `remove_bundle` 完成；
 - 手写行的：删掉那一行。
 
 官方选择器立刻回来（客户端插件随 Loader 条目一起卸载）。
