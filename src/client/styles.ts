@@ -192,9 +192,26 @@ export const styles = {
 	},
 	/** 拖动中的圆钮：只把内侧描边加深一点（`track.tsx` 按 `dragging` 切），不做光晕。 */
 	thumbActive: { boxShadow: 'inset 0 0 0 1px rgba(0, 0, 0, .18)' },
-	// 列表是 Codex 式的**平铺**（没有分组卡片，也没有组名）：分组信息退到每行的
-	// `aria-label` 里，视觉上只留"模型名 + 档位 + 勾"。之前那版 provider 卡片是为
-	// "分组名与模型名分不出来"加的，后来明确要求向 Codex 看齐，于是撤掉。
+	// 一个 provider 分组：一行可见组名 + 该 provider 的模型行。**不是卡片**——没有底色、
+	// 没有边框、没有圆角容器，组名只是个标题行；早先被撤掉的是 provider 圆角卡片
+	// （border-l3 + radius + 掺色底），别把组名重新做回卡片。
+	group: { display: 'flex', flexDirection: 'column', gap: '2px' },
+	// 组名（provider）：用户配置的第三方路由与官方 provider 的模型混在一个列表里，
+	// 只靠 aria-label 时肉眼分不出"这个模型是谁家的"（实测反馈：分组要加回来）。
+	// 比模型行（label-primary）浅两档、字号小一号、加一点字距，只做分隔不抢戏。
+	groupLabel: {
+		padding: '6px 8px 2px',
+		color: 'var(--dsw-alias-label-tertiary)',
+		fontSize: '11px',
+		fontWeight: 500,
+		letterSpacing: '0.02em',
+		lineHeight: '16px',
+		overflow: 'hidden',
+		whiteSpace: 'nowrap',
+		textOverflow: 'ellipsis',
+		userSelect: 'none',
+	},
+	// 组内每一行仍是**平铺**的（无卡片）：视觉上只留"模型名 + 档位 + 勾"。
 	rowButton: {
 		display: 'flex',
 		alignItems: 'center',
@@ -218,7 +235,8 @@ export const styles = {
 	list: {
 		display: 'flex',
 		flexDirection: 'column',
-		// 平铺列表（没有卡片）行距要小，行本身承担 hover/选中高亮。
+		// 行距要小（没有卡片），行本身承担 hover/选中高亮；provider 之间靠组名的
+		// `groupLabel` 上内边距拉开，不用额外分隔线。
 		gap: '2px',
 		maxHeight: 'min(320px, 50vh)',
 		overflowY: 'auto',

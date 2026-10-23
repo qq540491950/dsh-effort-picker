@@ -35,7 +35,7 @@
 | `←` / `→` | 降/升一档并提交（焦点在触发器上即可，不必先点面板） |
 | `Home` / `End` | 跳到最低/最高档 |
 | `Esc` | 退回上一层；已在根层则关闭面板 |
-| 点击标题下方的模型名（带 ›） | 下钻到模型列表：**平铺**一行一个模型（Codex 式，无卡片无组名），行尾是勾；每行显示该模型的档位（当前模型显示**正在用的档位**，其它模型显示**选中它会带上的档位** = 该模型的最高档），选中后带上该模型的最高档 |
+| 点击标题下方的模型名（带 ›） | 下钻到模型列表：**按 provider 分组**，每组一行组名（`cpa` / `huawei` / 官方 provider…，一眼看出这个模型是谁家的），组内一行一个模型（平铺，无卡片），行尾是勾；每行显示该模型的档位（当前模型显示**正在用的档位**，其它模型显示**选中它会带上的档位** = 该模型的最高档），选中后带上该模型的最高档 |
 | 点击面板外 | 关闭 |
 
 档位数是**自适应**的：直接取当前模型 `reasoning.efforts` 的长度。本机
@@ -66,7 +66,7 @@
 
 | 场景 | 填什么 | 装完是什么 |
 |---|---|---|
-| 当成品用 | `github:qq540491950/dsh-effort-picker#v0.0.3`（完整写法 `git+https://github.com/qq540491950/dsh-effort-picker.git#v0.0.3` 也行） | profile 里的**拷贝**；钉住 tag，改代码要 bump 版本 + 打新 tag 再装。tag 必须与 `package.json` 的 `version` 一致（当前 `0.0.3`） |
+| 当成品用 | `github:qq540491950/dsh-effort-picker#v0.0.4`（完整写法 `git+https://github.com/qq540491950/dsh-effort-picker.git#v0.0.4` 也行） | profile 里的**拷贝**；钉住 tag，改代码要 bump 版本 + 打新 tag 再装。tag 必须与 `package.json` 的 `version` 一致（当前 `0.0.4`） |
 | 开发迭代 | `D:\project\dsh-plugins\dsh-effort-picker`（绝对路径） | profile 里的 **junction**；`npm run build` 之后 HMR 立刻看到新产物 |
 
 在 GUI 里是**侧栏「插件」→「添加插件」**（主按钮直接打开安装对话框；箭头里的「安装第三方插件」打开同一个框），
@@ -77,7 +77,7 @@
 装完界面若没变化，按 `Ctrl+R` 刷新一次。想确认台账里有没有生效，用 `cordis_inspect_query`
 （Client · `Slots.listSubTree`，root = `conversation.input.model`）看是否多了一条 `priority -1` 的 occupant。
 
-> 只有发布到 npm 之后才能直接填包名（`dsh-effort-picker` / `dsh-effort-picker@0.0.3`）；
+> 只有发布到 npm 之后才能直接填包名（`dsh-effort-picker` / `dsh-effort-picker@0.0.4`）；
 > 现在 `"private": true` 且未发布，所以要用 git 地址、绝对路径或 tarball。
 
 #### 两个必须知道的坑
@@ -160,15 +160,18 @@ node D:\project\dsh-plugins\dsh-effort-picker\tools\verify.ts `
 
 ## 已知取舍
 
-- **未做搜索与排序**：模型列表是平铺的（provider 只留在 `aria-label` 里），不做模糊搜索，也不做 provider
-  排序（官方把 DeepSeek Account 排在最前）。官方在 ≤4 个模型时也不显示搜索框；模型变多后需要补上
+- **未做搜索与排序**：模型列表按 provider 分组（组名可见），但不做模糊搜索，也不做 provider 排序
+  （官方把 DeepSeek Account 排在最前）。官方在 ≤4 个模型时也不显示搜索框；模型变多后需要补上
   （`/model` 命令弹窗仍是完整功能的那一个）。
 - **文案硬编码中文**：没有注册 locale 命名空间（避免多一处失败面）。
-- **模型列表是平铺的（向 Codex 看齐）**：没有 provider 分组卡片、也没有组名，一行就是「模型名 + 该模型的
-  档位 + 勾」；当前行用 `color-mix(label-primary 11%, transparent)` 底色 + 行尾勾标出来。分组信息没有丢——
-  它写在每行的 `aria-label` 里（"模型名，provider"），同名模型来自不同 provider 时读屏仍能分辨。
-  早先那版 provider 圆角卡片是为"分组名与模型名分不出来"加的，后来明确要求改成 Codex 的样子，于是撤掉；
-  **别再"修复"回卡片**（AGENTS.md 第 3 节也钉了这条）。
+- **模型列表按 provider 分组、组内平铺**：每组一行组名（`group.name ?? group.id`，`label-tertiary`、11px，
+  只是个标题行），组内一行就是「模型名 + 该模型的档位 + 勾」；当前行用
+  `color-mix(label-primary 11%, transparent)` 底色 + 行尾勾标出来。分组是为了回答"这个模型是谁家的"——
+  用户配置的第三方路由（cpa / huawei / tengxun…）和官方 provider 的模型混在同一个列表里，只有
+  `aria-label` 的时候肉眼分不出（实测反馈：分组要加回来）。**没有模型的 provider 不渲染空组名**；
+  `aria-label` 照旧带 provider（"模型名，provider"），读屏不依赖"组标题被念过"。
+  早先那版 provider **圆角卡片**（border-l3 + radius + 掺色底）已经被撤掉，现在是组名 + 平铺行；
+  **别再做回卡片**（AGENTS.md 第 3 节也钉了这条）。
 - **切模型带上该模型的最高档**（不是路由默认档，也不是"不带档位"）：
   - 不带档位会把会话档位**清空**，选择器随即没有滑块头（`activeIndex = -1` → 轨道不渲染
     thumb / fill），看起来就是"滑块不行"；

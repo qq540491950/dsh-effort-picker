@@ -103,7 +103,7 @@ ctx.inject(["slots", "modelDirectories", "sessions", "remote", "remote.session"]
 | 触发器只显示**已提交**档位（`committedLabel`）；拖动预览（`effortLabel`）只允许出现在面板标题里 | 触发器在面板外面，跟着拖动预览变会让下方控件在 Low/Medium/High 之间跳、宽度跟着抖 | verify 第 8b 组 |
 | 触发器**不放前导图标**（`IconDataOutlineRegular` 已去掉），且 `triggerEffort` 不跟 `--dsh-composer-model-text-display` 一起藏 | 位置和宽度仍与官方一致，但那枚"数据库"图标是多余的（反馈点掉）；紧凑模式官方会退化成"只剩一枚图标"，我们没图标了，档位必须留住，否则只剩一个 chevron 像坏了 | verify 第 6 节 |
 | 触发器里模型名是 `label-secondary`、档位是 `label-caption`（比模型名浅一号，**不是** brand 色） | 触发器里"模型名 · 档位"要分得出主次（反馈：档位的字浅一点） | verify 第 6 节 |
-| 模型列表是**平铺**的：没有分组卡片、没有组名；provider 只写进每行的 `ariaLabel`；当前行行尾有勾、并用 `rowActive` 底色 | 已按要求向 Codex 看齐。早先那版 provider 圆角卡片（border-l3 + radius + 掺色底 + 组名 label-tertiary）正是为"分组名与模型名分不出来"两轮反馈加的，后来明确撤掉——**别"修复"回卡片**；分组信息靠 `ariaLabel` 保住读屏可分辨 | verify 第 10 节 |
+| 模型列表**按 provider 分组**：每组一行可见组名（`group.name ?? group.id`，`label-tertiary` / 11px）、组内仍是平铺行；provider 同时写进每行 `ariaLabel`；空组（`models` 为空）不渲染；当前行行尾有勾、并用 `rowActive` 底色 | 用户配置的第三方路由（cpa / huawei / tengxun…）与官方 provider 的模型混在同一个列表里，只靠 `ariaLabel` 时**肉眼**分不出"这个模型是谁家的"（实测反馈：分组要加回来）。被撤掉的是 provider **圆角卡片**（border-l3 + radius + 掺色底）——组名只是标题行，**别再做回卡片**；`ariaLabel` 也照旧带 provider，读屏不依赖"组标题被念过" | verify 第 10 节 |
 | 面板 `width: "224px"` 与轨道 200px 同源 | 轨道不设自身宽度，撑满内容宽 = 面板宽 − 左右各 12px padding；改面板宽等于改轨道宽 | 人工 |
 | `chooseModel` 必须带上新模型的**最高档**（`efforts.at(-1).id`），既不能省略 `reasoningEffort`、也不能用路由默认档 `defaultEffort` | 省略 = 会话档位被清空 → `activeIndex = -1` → 轨道不渲染滑块头，用户看到"滑块不行"；路由默认档是"一条路由一个值"，huawei 设成 high 后连支持 max 的模型也落在 high（两条都是实测反馈）。**只影响"刚切过去落在哪一格"，滑块照旧能拖到任意档** | verify 第 10 节（含"没有 defaultEffort 的模型也要带上最高档"） |
 | 只要模型有档位，轨道上就必须画得出滑块头：`shownIndex = activeIndex >= 0 ? activeIndex : efforts.length - 1`；兜底时 `committedLabel` / `effortLabel` 补「（默认）」后缀 | 会话档位没显式设置时（官方 `/model` 切换）旧实现 `shownRatio = null` → thumb / fill 全不渲染，轨道看起来就是坏的；补后缀是为了不把兜底位置说成用户选过的档位 | verify 第 8c 组 |
@@ -147,15 +147,16 @@ bundle → Host 在 `/plugins` 下发布并写进浏览器 boot graph。
    "看起来没问题"替代实际输出。
 7. 提交（第 6 节）并推送。
 
-自检覆盖 16 个分组（含 `4b` 降级、`8b` 连续跟手、`8c` 档位未设置时的滑块头、`11b` 面板落位）共 113 条
-断言（带 `--patch` 时 115 条）：包清单契约与**构建新鲜度**（`src/` 改了没构建会直接失败，新增文件与
+自检覆盖 16 个分组（含 `4b` 降级、`8b` 连续跟手、`8c` 档位未设置时的滑块头、`11b` 面板落位）共 124 条
+断言（带 `--patch` 时 126 条）：包清单契约与**构建新鲜度**（`src/` 改了没构建会直接失败，新增文件与
 纯类型文件也算）、宿主 `apply`、
 模块协议（含"产物只向平台要种子模块"）、`priority -1` 注册与注入清单回归护栏、`resolve()` 解析、解析失败
 时座位内降级（不退役条目、上报控制台、排自动重试）、子代理会话短路、触发器文案（含"不放前导图标、
 紧凑模式保留档位、档位比模型名浅"）、滑杆 ARIA、停靠点数量、形状（轨道与填充都是胶囊、滑块是正圆、轨道
 22px < 滑块 25px）、进度填充与滑块同源、主题适配（轨道掺色 / 圆钮带描边 / 停靠点掺 label-primary）、拖拽只提交一次且触发器不跟手跳、键盘调档、档位未显式设置时滑块头仍在最高档且标
-「默认」、失败提示保留面板、面板落位（上方优先 / 放不下翻转 / 左右不越界）、模型下钻（平铺列表：
-无分组卡片、`ariaLabel` 带 provider、当前行行尾有勾；"选模型带最高档 / 列表显示选中会带上的档位"）、
+「默认」、失败提示保留面板、面板落位（上方优先 / 放不下翻转 / 左右不越界）、模型下钻（**按 provider 分组**：
+组名可见且是标题行、空组不渲染、行装在组里、跨组选择提交各自的 provider、`ariaLabel` 仍带 provider、
+当前行行尾有勾；"选模型带最高档 / 列表显示选中会带上的档位"）、
 接线形态（bundle 补丁层；带 `--patch` 时再查 profile 是手写行还是 bundle 安装）。第 12 组会把补丁里的
 id / name 与**本机实际路径**核对，所以**仓库搬家后要么重新安装 bundle，要么同步改 profile 里的路径行**
 （forward slash 形式）。
@@ -185,7 +186,7 @@ profile 是**用户的环境**，不是本仓库的一部分：`C:\Users\admin\.
 `package.json` 依赖、`dsh.profile.bundles` 以及 Loader 行都由安装器写——本仓库只提供
 `cordis.patch.yml` 那一层，不碰用户的其它配置。spec 有两种形态，装的是同一个包：
 
-- `github:qq540491950/dsh-effort-picker#v0.0.3`：**成品形态**，钉 tag（必须等于 `package.json` 的
+- `github:qq540491950/dsh-effort-picker#v0.0.4`：**成品形态**，钉 tag（必须等于 `package.json` 的
   `version`），profile 里是拷贝；
 - `D:\project\dsh-plugins\dsh-effort-picker`：**开发形态**，profile 里是 junction，`npm run build` 即刻生效。
 

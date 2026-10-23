@@ -302,6 +302,15 @@ const GROUPS: ModelGroup[] = [
 			{ id: 'cn:glm-5.3-flash', name: 'glm-5.3-flash', reasoning: { efforts: EFFORT_LEVELS.slice(1, 5) } },
 		],
 	},
+	// 第二个 provider：分组标题的回归护栏。真实场景就是"官方 provider + 用户配置的第三方路由"
+	// 混在同一个列表里——那时只靠 aria-label 时肉眼分不出谁家的（实测反馈：分组要加回来）。
+	{
+		id: 'deepseek',
+		name: 'DeepSeek 官方',
+		models: [{ id: 'deepseek-chat', name: 'deepseek-chat', reasoning: { efforts: EFFORT_LEVELS.slice(0, 3) } }],
+	},
+	// 没有模型的 provider 不许渲染出空组名。
+	{ id: 'unused', name: '未使用的路由', models: [] },
 ];
 const SNAPSHOT: DirectorySnapshot = {
 	status: 'ready',
@@ -938,20 +947,64 @@ check('该入口显示当前模型', textOf(modelLine).includes('deepseek-v4.1-f
 modelLine.props.onClick();
 modelTree = modelSeat.render();
 const modelRows = findByRole(modelTree, 'menuitemradio');
-check('模型列表渲染出 3 个模型', modelRows.length === 3, String(modelRows.length));
+check('模型列表渲染出 4 个模型（两个 provider）', modelRows.length === 4, String(modelRows.length));
 check('当前模型被标记为选中', modelRows[0].props.checked === true, String(modelRows[0].props.checked));
-// 列表是 Codex 式**平铺**：没有分组卡片、也没有组名（按要求向 Codex 看齐，撤掉了
-// 早先那版 provider 圆角卡片）。分组信息改由每行的 aria-label 带着——同名模型来自
-// 不同 provider 时，读屏仍然分得清，这是"去掉视觉组名"的替代，不是丢失。
+// 列表**按 provider 分组**：每组一行可见组名。用户配置的第三方路由（cpa / huawei …）
+// 与官方 provider 的模型混在同一个列表里，只靠 aria-label 的时候肉眼分不出谁家的
+// （实测反馈：分组要加回来）。分组必须是**结构性**的——模型行装在组里，不是随便多印一行字。
+const groupNodes = findAll(modelTree, (node) => node.props?.role === 'group');
+check('列表按 provider 分组：两个有模型的 provider 各一组', groupNodes.length === 2, String(groupNodes.length));
 check(
-	'平铺列表：没有分组卡片',
-	findAll(modelTree, (node) => node.props?.role === 'group').length === 0,
-	String(findAll(modelTree, (node) => node.props?.role === 'group').length),
+	'组名用 provider 的 name（缺省回落到 id）',
+	groupNodes.map((group) => String(group.props['aria-label'])).join(' | ') === 'cpa | DeepSeek 官方',
+	groupNodes.map((group) => String(group.props['aria-label'])).join(' | '),
+);
+const rowsIn = (group: FakeElement): FakeElement[] =>
+	findAll(group, (node) => node.props?.role === 'menuitemradio');
+check('第一个组里正好 3 个模型行', rowsIn(groupNodes[0]).length === 3, String(rowsIn(groupNodes[0]).length));
+check('第二个组里正好 1 个模型行', rowsIn(groupNodes[1]).length === 1, String(rowsIn(groupNodes[1]).length));
+check(
+	'没有模型的 provider 不渲染空组名',
+	!textOf(modelTree).includes('未使用的路由'),
+	textOf(modelTree),
+);
+// 组名是标题行，不是可选行：不能是 button，也不能带 menuitemradio。
+check(
+	'组名只是标题、不是可选行',
+	groupNodes.every((group) => group.type === 'div' && group.props.role !== 'menuitemradio'),
+	String(groupNodes.map((group) => String(group.type)).join(' | ')),
+);
+// 组名可见（视觉上真印出来），但比模型行浅：label-tertiary ↔ 模型行 label-primary。
+const groupLabelText = (group: FakeElement): string =>
+	findAll(group, (node) => node.props?.['aria-hidden'] === 'true')
+		.map((node) => textOf(node))
+		.join('');
+check('第一个组的组名印出来了（cpa）', groupLabelText(groupNodes[0]) === 'cpa', groupLabelText(groupNodes[0]));
+check(
+	'第二个组的组名印出来了（DeepSeek 官方）',
+	groupLabelText(groupNodes[1]) === 'DeepSeek 官方',
+	groupLabelText(groupNodes[1]),
+);
+const groupLabelStyle = /groupLabel:\s*\{([^{}]*)\}/.exec(clientSource)?.[1] ?? '';
+check(
+	'组名用 label-tertiary（比模型行浅一档）',
+	groupLabelStyle.includes('label-tertiary'),
+	groupLabelStyle.replace(/\s+/g, ' ').trim(),
+);
+// 组名只做分隔，不做卡片：组容器没有边框、没有底色、没有圆角。
+const groupStyle = /(?<![A-Za-z])group:\s*\{([^{}]*)\}/.exec(clientSource)?.[1] ?? '';
+check(
+	'组容器不是卡片（无 border / 底色 / 圆角）',
+	groupStyle.includes('flexDirection') && !/(border|background|borderRadius)/.test(groupStyle),
+	groupStyle.replace(/\s+/g, ' ').trim(),
 );
 const rowLabels = modelRows.map((row) => String(row.props.ariaLabel));
 check(
-	'每行的 aria-label 带上 provider（同名模型也能分清）',
-	rowLabels.every((label) => label.includes('cpa')),
+	'每行的 aria-label 仍带上自己的 provider',
+	rowLabels[0].includes('cpa') &&
+		rowLabels[1].includes('cpa') &&
+		rowLabels[2].includes('cpa') &&
+		rowLabels[3].includes('DeepSeek 官方'),
 	rowLabels.join(' | '),
 );
 // 模型行主文字仍是 label-primary（来自 bundle 源码里的 rowButton）。
@@ -987,6 +1040,19 @@ check(
 	JSON.stringify(modelHarness.calls.select[1]),
 );
 check('并且确实提交了 model id', modelHarness.calls.select[1]?.model === 'cn:glm-5.3-flash', JSON.stringify(modelHarness.calls.select[1]));
+// 跨组选择：点第二个 provider 的模型，提交的是**它自己的** provider。分组只是视觉分隔，
+// 不能把组里的行搞混成"都按第一组的 provider 提交"。
+modelRows[3].props.onClick();
+check(
+	'跨组选模型提交对应的 provider',
+	modelHarness.calls.select[2]?.provider === 'deepseek',
+	JSON.stringify(modelHarness.calls.select[2]),
+);
+check(
+	'跨组选模型提交该模型 id',
+	modelHarness.calls.select[2]?.model === 'deepseek-chat',
+	JSON.stringify(modelHarness.calls.select[2]),
+);
 //#endregion
 
 //#region 11. 失败提示

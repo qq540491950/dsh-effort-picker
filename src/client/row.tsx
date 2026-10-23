@@ -16,8 +16,9 @@ export interface RowProps {
 	disabled?: boolean;
 	title?: string;
 	/**
-	 * 读屏用的整句标签。列表改成平铺后没有 provider 组名了，分组信息就靠它带上
-	 * （同名的模型来自不同 provider 时，这一句是唯一能分辨的地方）。
+	 * 读屏用的整句标签。列表已按 provider 分组、组名可见，但 provider 仍然写进每一行：
+	 * 读屏按行的顺序念，不依赖"组标题被念过"这件事；同名模型来自不同 provider 时，
+	 * 这一句是唯一念得出来的区分。
 	 */
 	ariaLabel?: string;
 	onClick?: () => void;

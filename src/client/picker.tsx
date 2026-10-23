@@ -424,43 +424,60 @@ function CodexEffortPickerSeat(props: SeatProps) {
 									<primitives.IconChevronLeftOutlineRegular size={14} style={styles.chevron} />
 									<span style={styles.caption}>返回</span>
 								</Row>
-								{state.groups.flatMap((group) =>
-									group.models.map((model) => {
-										const isCurrent = current?.provider === group.id && current?.model === model.id;
-										const levels = model.reasoning?.efforts ?? [];
-										// 当前模型显示会话正在用的档位；其它模型显示**选中它会带上的那一档**
-										// （= 该模型的最高档，见 chooseModel）。
-										//
-										// 原来这里显示路由默认档（`model.reasoning.defaultEffort`），
-										// 而路由默认档是"一条路由一个值"：huawei 设成 high 之后每个模型
-										// 都显示 High，看不出谁支持 max（实测反馈：「huawei 都是 high」）。
-										const appliedEffort = levels.length > 0 ? levels[levels.length - 1].id : undefined;
-										const effortId = isCurrent
-											? (current?.reasoningEffort ?? model.reasoning?.defaultEffort ?? appliedEffort)
-											: appliedEffort;
-										const effortName = levels.find((level) => level.id === effortId)?.name ?? effortId;
-										return (
-											<Row
-												key={`${group.id}/${model.id}`}
-												role="menuitemradio"
-												checked={isCurrent}
-												disabled={lockedNow}
-												// 平铺后没有组名了：provider 放进读屏标签，视觉上不占位置。
-												ariaLabel={`${model.name ?? model.id}，${group.name ?? group.id}`}
-												title={levels.length === 0 ? undefined : `${String(levels.length)} 档可选`}
-												onClick={() => chooseModel(group, model)}
-											>
-												<span style={styles.modelName}>{model.name ?? model.id}</span>
-												{effortName === undefined ? null : (
-													<span style={isCurrent ? styles.effortName : styles.caption}>{effortName}</span>
-												)}
-												<span style={styles.slot}>
-													{isCurrent ? <primitives.IconCheckOutlineRegular size={14} /> : null}
-												</span>
-											</Row>
-										);
-									}),
-								)}
+								{state.groups
+									.filter((group) => group.models.length > 0)
+									.map((group) => (
+										<div
+											key={group.id}
+											role="group"
+											aria-label={group.name ?? group.id}
+											style={styles.group}
+										>
+											{/* 组名（provider）可见：用户配置的第三方路由（cpa / huawei / tengxun…）
+											    与官方 provider 的模型混在同一个列表里，没有这一行就分不出"这个模型是
+											    谁家的"（实测反馈）。它只是标题行，不是可选行；`role="group"` 上的
+											    aria-label 已经念过同一个名字，所以视觉标题对读屏隐藏，避免重复播报。 */}
+											<div style={styles.groupLabel} aria-hidden="true">
+												{group.name ?? group.id}
+											</div>
+											{group.models.map((model) => {
+												const isCurrent = current?.provider === group.id && current?.model === model.id;
+												const levels = model.reasoning?.efforts ?? [];
+												// 当前模型显示会话正在用的档位；其它模型显示**选中它会带上的那一档**
+												// （= 该模型的最高档，见 chooseModel）。
+												//
+												// 原来这里显示路由默认档（`model.reasoning.defaultEffort`），
+												// 而路由默认档是"一条路由一个值"：huawei 设成 high 之后每个模型
+												// 都显示 High，看不出谁支持 max（实测反馈：「huawei 都是 high」）。
+												const appliedEffort = levels.length > 0 ? levels[levels.length - 1].id : undefined;
+												const effortId = isCurrent
+													? (current?.reasoningEffort ?? model.reasoning?.defaultEffort ?? appliedEffort)
+													: appliedEffort;
+												const effortName = levels.find((level) => level.id === effortId)?.name ?? effortId;
+												return (
+													<Row
+														key={`${group.id}/${model.id}`}
+														role="menuitemradio"
+														checked={isCurrent}
+														disabled={lockedNow}
+														// 组名已经可见，provider 仍然留在读屏标签里：读屏按行的顺序念，
+														// 不依赖"组标题被念过"这件事，同名模型来自不同 provider 也分得清。
+														ariaLabel={`${model.name ?? model.id}，${group.name ?? group.id}`}
+														title={levels.length === 0 ? undefined : `${String(levels.length)} 档可选`}
+														onClick={() => chooseModel(group, model)}
+													>
+														<span style={styles.modelName}>{model.name ?? model.id}</span>
+														{effortName === undefined ? null : (
+															<span style={isCurrent ? styles.effortName : styles.caption}>{effortName}</span>
+														)}
+														<span style={styles.slot}>
+															{isCurrent ? <primitives.IconCheckOutlineRegular size={14} /> : null}
+														</span>
+													</Row>
+												);
+											})}
+										</div>
+									))}
 							</div>
 						) : null}
 
