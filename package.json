@@ -1,7 +1,10 @@
 {
   "name": "dsh-effort-picker",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "private": true,
+  "engines": {
+    "dsh": ">=0.2.0-rc.2 <0.3.0"
+  },
   "description": "DSH Web 客户端插件：把 composer 的思考模式（reasoning effort）换成 Codex 风格的档位滑杆（浅蓝滑轨 + 白圆钮）。TypeScript 源码 + esbuild 产物。",
   "type": "module",
   "main": "lib/index.js",
@@ -25,17 +28,28 @@
   },
   "scripts": {
     "build": "node tools/build.ts",
-    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.tools.json",
+    "build:force": "node tools/build.ts --force",
+    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.tools.json && tsc -p tsconfig.test.json",
     "verify": "node tools/verify.ts",
-    "check": "npm run typecheck && npm run build && node tools/verify.ts"
+    "test": "vitest run",
+    "check": "npm run typecheck && npm run build && node tools/verify.ts && npm run test"
   },
   "devDependencies": {
     "@floating-ui/dom": "^1.8.0",
+    "@testing-library/dom": "^10.4.2",
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.3",
+    "@testing-library/user-event": "^14.6.8",
     "@types/node": "^24.10.1",
     "@types/react": "~18.3.1",
     "@types/react-dom": "~18.3.0",
     "esbuild": "^0.28.2",
-    "typescript": "~5.9.3"
+    "jsdom": "^30.1.3",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "typescript": "~5.9.3",
+    "vite": "^8.3.5",
+    "vitest": "^5.0.5"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "~4.0.4"

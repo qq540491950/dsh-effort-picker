@@ -244,11 +244,52 @@ export const styles = {
 		overscrollBehavior: 'contain',
 		scrollbarGutter: 'stable',
 	},
+	// 模型超过 4 个时出现的搜索框；底色与 rowHover 同源，避免在菜单面上再引入一种材质。
+	search: {
+		width: '100%',
+		boxSizing: 'border-box',
+		padding: '6px 8px',
+		border: 'none',
+		borderRadius: '6px',
+		background: 'color-mix(in srgb, var(--dsw-alias-label-primary) 7%, transparent)',
+		color: 'var(--dsw-alias-label-primary)',
+		font: 'inherit',
+		fontSize: '12px',
+	},
 	modelName: { flex: 1, minWidth: 0, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' },
 	/** 行尾那一格：勾选图标，没有勾选时留同样宽的空格，保证模型名左对齐。 */
 	slot: { width: '18px', flex: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'flex-end' },
 	notice: { color: 'var(--dsw-alias-label-secondary)', fontSize: '12px', padding: '4px 2px' },
-	error: { color: 'var(--dsw-alias-state-error-primary)', fontSize: '12px', padding: '4px 2px' },
+	// provider 级加载失败：没有可选行，但必须让用户看见是哪一家失败了。
+	failureRow: {
+		display: 'flex',
+		flexDirection: 'column',
+		gap: '2px',
+		padding: '6px 8px',
+		color: 'var(--dsw-alias-state-error-primary)',
+		fontSize: '12px',
+		lineHeight: '16px',
+	},
+	error: {
+		display: 'flex',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+		gap: '8px',
+		color: 'var(--dsw-alias-state-error-primary)',
+		fontSize: '12px',
+		padding: '4px 2px',
+	},
+	retry: {
+		flex: 'none',
+		padding: '2px 4px',
+		border: 'none',
+		borderRadius: '4px',
+		background: 'transparent',
+		color: 'var(--dsw-alias-brand-primary)',
+		font: 'inherit',
+		fontSize: '12px',
+		cursor: 'pointer',
+	},
 	// 座位内部兜住错误时替换触发器的那一行提示（点击可重试）。
 	failure: {
 		display: 'flex',

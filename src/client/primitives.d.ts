@@ -27,6 +27,7 @@ declare module '@deepseek-ai/dsh-client-ui-primitives' {
 	export interface MenuSurfaceProps {
 		children?: ReactNode;
 		compact?: boolean;
+		id?: string;
 		role?: string;
 		style?: CSSProperties;
 		'aria-label'?: string;

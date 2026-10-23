@@ -27,6 +27,10 @@ export interface EffortTrackProps {
 	onPointerDown: (event: PointerEvent<HTMLDivElement>) => void;
 	onPointerMove: (event: PointerEvent<HTMLDivElement>) => void;
 	onPointerUp: (event: PointerEvent<HTMLDivElement>) => void;
+	/** 指针被系统取消：只清拖拽态，不提交。 */
+	onPointerCancel: () => void;
+	/** 指针捕获丢失：清拖拽态，避免滑块停在半路。 */
+	onLostPointerCapture?: () => void;
 }
 
 /** 轨道本体。 */
@@ -98,7 +102,8 @@ export function EffortTrack(props: EffortTrackProps) {
 			onPointerDown={props.onPointerDown}
 			onPointerMove={props.onPointerMove}
 			onPointerUp={props.onPointerUp}
-			onPointerCancel={props.onPointerUp}
+			onPointerCancel={props.onPointerCancel}
+			onLostPointerCapture={props.onLostPointerCapture}
 		>
 			{fill}
 			{ticks}

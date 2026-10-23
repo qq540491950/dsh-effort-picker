@@ -39,6 +39,9 @@ interface Manifest {
 
 const pkg = JSON.parse(await readFile(join(ROOT, 'package.json'), 'utf8')) as { name: string; version: string };
 
+/** `--force`：内容相同也重写产物，用来给 HMR 制造一次新的 mtime。 */
+const FORCE = process.argv.includes('--force');
+
 /** `window.__ModuleLoader__.load({...})` 的海报：打开 factory 作用域。 */
 function clientBanner(): string {
 	return `/**
@@ -74,14 +77,21 @@ const HOST_BANNER = `/**
  */
 `;
 
-/** 原子替换写入；内容没变就跳过（不碰 mtime，HMR 不会多做一次无用发布）。 */
-async function writeIfChanged(file: string, content: string): Promise<'written' | 'unchanged'> {
+/**
+ * 原子替换写入；内容没变就跳过（不碰 mtime，HMR 不会多做一次无用发布）。
+ *
+ * `--force` 会连内容相同的产物也重写一次。恢复"条目被 HMR 退役、但源码没改"的现场时
+ * 需要它：宿主按 mtime/ctime/size 判版本，跳过写入就不会发新 rev。
+ */
+async function writeIfChanged(file: string, content: string, force = false): Promise<'written' | 'unchanged'> {
 	const next = Buffer.from(content, 'utf8');
-	try {
-		const current = await readFile(file);
-		if (current.equals(next)) return 'unchanged';
-	} catch {
-		/* 文件还不存在：照常写 */
+	if (!force) {
+		try {
+			const current = await readFile(file);
+			if (current.equals(next)) return 'unchanged';
+		} catch {
+			/* 文件还不存在：照常写 */
+		}
 	}
 	const temp = `${file}.tmp-${String(process.pid)}`;
 	await writeFile(temp, next);
@@ -157,7 +167,7 @@ for (const required of [`id: ${JSON.stringify(pkg.name)}`, 'window.__ModuleLoade
 	if (!clientText.includes(required)) throw new Error(`产物缺少接线契约：${required}`);
 }
 const clientInputs = inputsOf('lib/client.js', clientResult.metafile);
-report.push(`lib/client.js  ${(await writeIfChanged(join(LIB, 'client.js'), clientText))}  ${String(clientText.length)} B  ← ${String(clientInputs.length)} 个源文件`);
+report.push(`lib/client.js  ${(await writeIfChanged(join(LIB, 'client.js'), clientText, FORCE))}  ${String(clientText.length)} B  ← ${String(clientInputs.length)} 个源文件`);
 manifest.targets.push({
 	output: 'lib/client.js',
 	outputSha256: sha256(clientText),
@@ -184,7 +194,7 @@ const hostResult = await build({
 const hostText = hostResult.outputFiles[0].text;
 if (!hostText.includes('export {')) throw new Error('宿主产物没有导出任何东西（apply 丢了？）');
 const hostInputs = inputsOf('lib/index.js', hostResult.metafile);
-report.push(`lib/index.js   ${(await writeIfChanged(join(LIB, 'index.js'), hostText))}  ${String(hostText.length)} B  ← ${String(hostInputs.length)} 个源文件`);
+report.push(`lib/index.js   ${(await writeIfChanged(join(LIB, 'index.js'), hostText, FORCE))}  ${String(hostText.length)} B  ← ${String(hostInputs.length)} 个源文件`);
 manifest.targets.push({
 	output: 'lib/index.js',
 	outputSha256: sha256(hostText),
@@ -196,7 +206,7 @@ manifest.targets.push({
 const esbuildPkg = JSON.parse(await readFile(join(ROOT, 'node_modules/esbuild/package.json'), 'utf8')) as { version: string };
 manifest.tool = `esbuild@${esbuildPkg.version}`;
 
-await writeIfChanged(join(LIB, '.build-manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`);
+await writeIfChanged(join(LIB, '.build-manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`, FORCE);
 
 for (const line of report) console.log(line);
 console.log(`构建完成（${String(manifest.targets.length)} 个产物）`);

@@ -93,6 +93,7 @@ interface ReactStub {
 	mount(): void;
 	useState<T>(initial: T | (() => T)): [T, (next: T | ((previous: T) => T)) => void];
 	useRef<T>(initial: T): { current: T };
+	useId(): string;
 	useEffect(): void;
 	useLayoutEffect(): void;
 	useSyncExternalStore<T>(subscribe: (listener: () => void) => () => void, getSnapshot: () => T): T;
@@ -129,6 +130,12 @@ function createReactStub(): ReactStub {
 			if (!(slot in slots)) slots[slot] = { current: initial };
 			return slots[slot] as { current: T };
 		},
+		useId() {
+			const slot = cursor;
+			cursor += 1;
+			if (!(slot in slots)) slots[slot] = `test-${String(slot)}`;
+			return slots[slot] as string;
+		},
 		useEffect() {},
 		useLayoutEffect() {},
 		useSyncExternalStore<T>(_subscribe: (listener: () => void) => () => void, getSnapshot: () => T): T {
@@ -164,7 +171,13 @@ function createPrimitivesStub(react: ReactStub): Record<string, (props: Record<s
 		react.createElement('span', { 'data-icon': name, style: props?.style });
 	return {
 		MenuSurface: (props: Record<string, any>) =>
-			react.createElement('div', { 'data-surface': 'menu', style: props?.style }, props?.children),
+			react.createElement('div', {
+				'data-surface': 'menu',
+				id: props?.id,
+				role: props?.role,
+				'aria-label': props?.['aria-label'],
+				style: props?.style,
+			}, props?.children),
 		IconDataOutlineRegular: icon('data'),
 		IconChevronDownOutlineRegular: icon('chevron-down'),
 		IconChevronRightOutlineRegular: icon('chevron-right'),
@@ -463,6 +476,8 @@ function fakePointerEvent(clientX: number) {
 	return {
 		clientX,
 		pointerId: 1,
+		button: 0,
+		isPrimary: true,
 		nativeEvent: {},
 		preventDefault: () => {},
 		currentTarget: { setPointerCapture: () => {} },

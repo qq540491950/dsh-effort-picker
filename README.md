@@ -66,7 +66,7 @@
 
 | 场景 | 填什么 | 装完是什么 |
 |---|---|---|
-| 当成品用 | `github:qq540491950/dsh-effort-picker#v0.0.4`（完整写法 `git+https://github.com/qq540491950/dsh-effort-picker.git#v0.0.4` 也行） | profile 里的**拷贝**；钉住 tag，改代码要 bump 版本 + 打新 tag 再装。tag 必须与 `package.json` 的 `version` 一致（当前 `0.0.4`） |
+| 当成品用 | `github:qq540491950/dsh-effort-picker#v0.0.5`（完整写法 `git+https://github.com/qq540491950/dsh-effort-picker.git#v0.0.5` 也行） | profile 里的**拷贝**；钉住 tag，改代码要 bump 版本 + 打新 tag 再装。tag 必须与 `package.json` 的 `version` 一致（当前 `0.0.5`） |
 | 开发迭代 | `D:\project\dsh-plugins\dsh-effort-picker`（绝对路径） | profile 里的 **junction**；`npm run build` 之后 HMR 立刻看到新产物 |
 
 在 GUI 里是**侧栏「插件」→「添加插件」**（主按钮直接打开安装对话框；箭头里的「安装第三方插件」打开同一个框），
@@ -77,7 +77,7 @@
 装完界面若没变化，按 `Ctrl+R` 刷新一次。想确认台账里有没有生效，用 `cordis_inspect_query`
 （Client · `Slots.listSubTree`，root = `conversation.input.model`）看是否多了一条 `priority -1` 的 occupant。
 
-> 只有发布到 npm 之后才能直接填包名（`dsh-effort-picker` / `dsh-effort-picker@0.0.4`）；
+> 只有发布到 npm 之后才能直接填包名（`dsh-effort-picker` / `dsh-effort-picker@0.0.5`）；
 > 现在 `"private": true` 且未发布，所以要用 git 地址、绝对路径或 tarball。
 
 #### 两个必须知道的坑
@@ -108,6 +108,9 @@
 
 `name` 必须指向本仓库的 `lib/index.js`（正斜杠形式）——**仓库一搬家就要同步改这一行**。
 
+包清单另有 `engines.dsh`（当前 `>=0.2.0-rc.2 <0.3.0`）：DSH 版本不匹配时安装器会直接拒绝，
+而不是装上一个客户端契约已经变了的包。
+
 两种形态只差"这一行谁写"，之后 `dsh-client-modules` 的投递链路完全一样：从该条目的模块位置
 向上找最近的 `package.json` → 读 `dsh.client` 声明 → 从 `exports["./client"]` 定位浏览器 bundle
 → Host 在 `/plugins` 下发布并写进浏览器 boot graph。
@@ -123,10 +126,12 @@
 ## 开发（改代码）
 
 ```powershell
-pnpm install            # 一次即可：typescript / esbuild / @types/*
-pnpm typecheck          # src/ 与 tools/ 两份 tsconfig 都过一遍
+pnpm install            # 一次即可：构建链 + Vitest/jsdom/Testing Library
+pnpm typecheck          # src/、tools/、tests/ 三份 tsconfig 都过一遍
 pnpm build              # src/ → lib/client.js + lib/index.js（并写 .build-manifest.json）
-node tools/verify.ts   # 拿真实产物跑离线自检
+pnpm test               # 真实 React + jsdom：焦点/Tab/Esc/pending/拖拽/失败态
+node tools/verify.ts   # 拿真实产物跑投递契约自检
+# 或者一条命令：pnpm check（typecheck + build + verify + test）
 ```
 
 `lib/` 是**产物**：手改它，下一次构建就没了；只改 `src/` 不构建，自检会直接报
@@ -145,14 +150,16 @@ node D:\project\dsh-plugins\dsh-effort-picker\tools\verify.ts `
 都算通过；`--yaml` 可选，用真实 YAML 解析器校验该 patch 能解析。不带 `--patch` 时只有第 12b 组跳过。）
 
 自检是纯 Node、零依赖的离线程序（本身也是 TS，靠 Node 原生类型剥离直接跑）：用 `node:vm` 跑
-**真实的** `lib/client.js`，喂一个极简 React 替身与假 ctx，覆盖 16 组共 113 条断言（带 `--patch` 时
-115 条）。全部通过时打印 `全部通过 ✓` 并以 0 退出。
+**真实的** `lib/client.js`，喂一个极简 React 替身与假 ctx，覆盖 16 组共 124 条断言（带 `--patch` 时
+126 条）。它守的是投递契约、注入清单、数据换算和视觉不变量；交互行为另由
+`tests/picker.client.spec.tsx` 的 10 条 Vitest + jsdom 用例覆盖（焦点、Tab/Shift+Tab、Esc、pending、
+拖拽取消、搜索、空态/失败态）。全部通过时打印 `全部通过 ✓` 并以 0 退出。
 
 ## 出问题时
 
 | 症状 | 怎么办 |
 |---|---|
-| 界面里模型控件整个没了 | 重新 `npm run build`（内容不变也行，mtime/size 变了宿主会发新 rev），或按 `Ctrl+R`。不必重启 DSH |
+| 界面里模型控件整个没了 | `pnpm build:force`（内容不变也重写产物，mtime 变了宿主才会发新 rev），或按 `Ctrl+R`。不必重启 DSH |
 | 想知道为什么失败 | 读 `localStorage["dsh-effort-picker:last-failure"]`，或看控制台 `[dsh-effort-picker]` 前缀的记录 |
 | 想立刻回到官方控件 | bundle 安装的用 `set_bundle` 关掉 / `remove_bundle`；手写行的删掉那一行 |
 
@@ -160,9 +167,9 @@ node D:\project\dsh-plugins\dsh-effort-picker\tools\verify.ts `
 
 ## 已知取舍
 
-- **未做搜索与排序**：模型列表按 provider 分组（组名可见），但不做模糊搜索，也不做 provider 排序
-  （官方把 DeepSeek Account 排在最前）。官方在 ≤4 个模型时也不显示搜索框；模型变多后需要补上
-  （`/model` 命令弹窗仍是完整功能的那一个）。
+- **未做 provider 排序**：模型列表按 provider 分组（组名可见），超过 4 个模型时提供按名称过滤的
+  搜索框；但不做 provider 排序（官方把 DeepSeek Account 排在最前）。搜索只匹配模型名，不做前缀/模糊评分，
+  `/model` 命令弹窗仍是完整功能的那一个。
 - **文案硬编码中文**：没有注册 locale 命名空间（避免多一处失败面）。
 - **模型列表按 provider 分组、组内平铺**：每组一行组名（`group.name ?? group.id`，`label-tertiary`、11px，
   只是个标题行），组内一行就是「模型名 + 该模型的档位 + 勾」；当前行用

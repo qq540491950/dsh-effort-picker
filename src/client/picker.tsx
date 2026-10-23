@@ -11,7 +11,7 @@
  * 打开期间用 `autoUpdate` 跟随（composer 撑高、窗口缩放、外层滚动都不再错位）。
  */
 
-import type { CSSProperties, KeyboardEvent, PointerEvent } from 'react';
+import type { CSSProperties, FocusEvent, KeyboardEvent, PointerEvent } from 'react';
 import { autoUpdate, computePosition, flip, offset, shift } from '@floating-ui/dom';
 import { react, reactDom, h, primitives } from './platform';
 import { SeatBoundary } from './boundary';
@@ -70,6 +70,7 @@ function CodexEffortPickerSeat(props: SeatProps) {
 
 	const [open, setOpen] = react.useState(false);
 	const [pane, setPane] = react.useState<Pane>('root');
+	const [query, setQuery] = react.useState('');
 	const [menuPos, setMenuPos] = react.useState<PanelPoint | null>(null);
 	const [dragRatio, setDragRatio] = react.useState<number | null>(null);
 	const [failure, setFailure] = react.useState<string | null>(null);
@@ -80,9 +81,14 @@ function CodexEffortPickerSeat(props: SeatProps) {
 	const rootRef = react.useRef<HTMLDivElement>(null);
 	const triggerRef = react.useRef<HTMLButtonElement>(null);
 	const menuRef = react.useRef<HTMLElement>(null);
+	const modelButtonRef = react.useRef<HTMLButtonElement>(null);
+	const searchRef = react.useRef<HTMLInputElement>(null);
+	const listRef = react.useRef<HTMLDivElement>(null);
 	const trackRef = react.useRef<HTMLDivElement>(null);
 	const thumbRef = react.useRef<HTMLSpanElement>(null);
 	const fillRef = react.useRef<HTMLSpanElement>(null);
+	/** 菜单 / 列表 / aria-controls 共用的稳定 id（React 18 的 useId 含冒号，只做属性值用）。 */
+	const id = react.useId();
 
 	// ---- 派生：当前模型与它的档位集合 ----
 	const current = state.current;
@@ -94,6 +100,21 @@ function CodexEffortPickerSeat(props: SeatProps) {
 					?.models.find((model) => model.id === current.model);
 	const reasoning = currentModel?.reasoning;
 	const efforts = reasoning?.efforts ?? [];
+	const groups = state.groups.filter((group) => group.models.length > 0);
+	const failures = state.failures ?? [];
+	const totalModels = groups.reduce((sum, group) => sum + group.models.length, 0);
+	// 与官方一致的阈值：模型超过 4 个才显示搜索，避免小目录多一个控件。
+	const showSearch = totalModels > 4;
+	const normalizedQuery = query.trim().toLowerCase();
+	const filteredGroups = normalizedQuery === ''
+		? groups
+		: groups
+				.map((group) => ({
+					...group,
+					models: group.models.filter((model) =>
+						(model.name ?? model.id).toLowerCase().includes(normalizedQuery)),
+				}))
+				.filter((group) => group.models.length > 0);
 	const effectiveEffort = current?.reasoningEffort ?? reasoning?.defaultEffort;
 	const activeIndex = efforts.findIndex((level) => level.id === effectiveEffort);
 	/**
@@ -135,9 +156,42 @@ function CodexEffortPickerSeat(props: SeatProps) {
 				? '载入中…'
 				: '选择模型'
 			: (currentModel?.name ?? `${current.provider}/${current.model}`);
-	const busy = state.pending !== null;
-	const lockedNow = locked === true || available === false;
+	const busy = state.pending !== null && state.pending !== undefined;
+	// 触发器只在 owner 锁定时禁用；pending 期间它必须保持可聚焦，否则焦点会掉到
+	// disabled 行上、面板随即因 blur 关闭（官方的 submit 也是先 focus trigger）。
+	const triggerLocked = locked === true;
+	const controlsLocked = triggerLocked || busy;
 	const message = failure ?? state.error ?? null;
+
+	/**
+	 * 焦点工具。面板是 portal，React 事件仍冒泡到这里，但 `document.activeElement`
+	 * 是真实 DOM 的焦点，必须按它判断；离线自检的假节点没有 querySelectorAll，
+	 * 这里统一容错，避免自检因为缺 DOM 能力而崩。
+	 */
+	const activeElement = (): HTMLElement | null => {
+		const active = typeof document === 'undefined' ? null : document.activeElement;
+		return active !== null && typeof active === 'object' && 'focus' in active ? (active as HTMLElement) : null;
+	};
+	const queryAll = (root: Element | null, selector: string): HTMLElement[] => {
+		if (root === null || typeof root.querySelectorAll !== 'function') return [];
+		return Array.from(root.querySelectorAll<HTMLElement>(selector));
+	};
+	/** 触发器 + 面板里的全部可聚焦控件，顺序即 Tab 顺序。 */
+	const focusables = (): HTMLElement[] => {
+		const nodes: HTMLElement[] = [];
+		if (triggerRef.current !== null && triggerRef.current.disabled !== true) nodes.push(triggerRef.current);
+		if (menuRef.current !== null) {
+			nodes.push(...queryAll(
+				menuRef.current,
+				'button:not([disabled]), input:not([disabled]), [role="slider"][tabindex="0"]',
+			));
+		}
+		return nodes;
+	};
+	/** 模型列表里的可聚焦行（含"返回"），用于方向键/Tab 导航。 */
+	const modelRows = (): HTMLElement[] => queryAll(listRef.current, 'button:not([disabled])');
+	/** 只含模型行（不含"返回"）；进入面板/Home/End 优先落在这里。 */
+	const modelChoices = (): HTMLElement[] => queryAll(listRef.current, '[role="menuitemradio"]:not([disabled])');
 
 	// ---- 副作用（无条件调用，早退放最后）----
 	react.useEffect(() => {
@@ -181,13 +235,32 @@ function CodexEffortPickerSeat(props: SeatProps) {
 		return autoUpdate(trigger, menu, update);
 	}, [open, pane, efforts.length]);
 
+	// 进入模型列表时把焦点落到当前行（或第一行）；返回根面板由 backToRoot() 负责。
+	react.useEffect(() => {
+		if (!open || pane !== 'model') return undefined;
+		if (showSearch) {
+			searchRef.current?.focus();
+			return undefined;
+		}
+		const checked = listRef.current?.querySelector<HTMLElement>(
+			'[role="menuitemradio"][aria-checked="true"]:not([disabled])',
+		) ?? null;
+		(checked ?? modelChoices()[0] ?? modelRows()[0])?.focus();
+		return undefined;
+	}, [open, pane, showSearch]);
+
 	// available === false 出现在被寻址的子代理会话上：与官方一致，什么都不渲染。
 	if (!available) return null;
 
 	// ---- 交互 ----
 	const show = (): void => {
+		// 鼠标点击触发器时，onMouseDown 的 preventDefault（WebKit 行内按钮保持焦点的
+		// 兼容处理）会让按钮拿不到焦点；这里显式补齐。官方 ModelSelect.show() 同样先
+		// focus trigger，否则 Esc / 方向键会落在 composer 里，面板等于没有键盘入口。
+		triggerRef.current?.focus();
 		setFailure(null);
 		setDragRatio(null);
+		setQuery('');
 		setPane('root');
 		setOpen(true);
 		load();
@@ -197,6 +270,51 @@ function CodexEffortPickerSeat(props: SeatProps) {
 		setPane('root');
 		setDragRatio(null);
 		if (restoreFocus === true) queueMicrotask(() => triggerRef.current?.focus());
+	};
+
+	/** 在"触发器 + 面板控件"之间循环移动焦点；Tab 不再把焦点漏到整个页面。 */
+	const moveTab = (direction: 1 | -1): void => {
+		const nodes = focusables();
+		if (nodes.length === 0) return;
+		const active = activeElement();
+		const index = active === null ? -1 : nodes.indexOf(active);
+		const next = index === -1
+			? (direction > 0 ? 0 : nodes.length - 1)
+			: (index + direction + nodes.length) % nodes.length;
+		nodes[next]?.focus();
+	};
+
+	/** 在模型行（含"返回"）之间循环移动焦点。 */
+	const moveModelFocus = (direction: 1 | -1): void => {
+		const rows = modelRows();
+		if (rows.length === 0) return;
+		const active = activeElement();
+		const index = active === null ? -1 : rows.indexOf(active);
+		const next = index === -1
+			? (direction > 0 ? 0 : rows.length - 1)
+			: (index + direction + rows.length) % rows.length;
+		rows[next]?.focus();
+	};
+
+	/** 从模型列表退回根面板，并把焦点交给"模型名"按钮。 */
+	const backToRoot = (): void => {
+		setPane('root');
+		queueMicrotask(() => modelButtonRef.current?.focus());
+	};
+
+	/**
+	 * 焦点离开"座位 + portal"时关闭面板。relatedTarget 在部分浏览器/测试环境里
+	 * 会是 null，所以再在微任务里按 document.activeElement 复核一次。
+	 */
+	const onRootBlur = (event: FocusEvent<HTMLDivElement>): void => {
+		if (!open) return;
+		const next = event.relatedTarget as Node | null;
+		if (next !== null && (rootRef.current?.contains(next) === true || menuRef.current?.contains(next) === true)) return;
+		queueMicrotask(() => {
+			const active = activeElement();
+			if (active !== null && (rootRef.current?.contains(active) === true || menuRef.current?.contains(active) === true)) return;
+			close();
+		});
 	};
 
 	/** 把一个选择结果落到面板上（失败时保留面板并显示原因）。 */
@@ -215,10 +333,12 @@ function CodexEffortPickerSeat(props: SeatProps) {
 
 	/** 提交一个档位（一次手势只提交一次）。 */
 	const commitEffort = (index: number): void => {
-		if (lockedNow || current === null || current === undefined) return;
+		if (controlsLocked || current === null || current === undefined) return;
 		const level = efforts[index];
 		if (level === undefined || level.id === effectiveEffort) return;
 		setFailure(null);
+		// pending 期间触发器保持 enabled；先把焦点放回去，面板不会因 disabled 行失焦。
+		triggerRef.current?.focus();
 		Promise.resolve(select({ provider: current.provider, model: current.model, reasoningEffort: level.id })).then(
 			(outcome) => settle(outcome),
 			(reason: unknown) => setFailure(String(reason)),
@@ -236,7 +356,9 @@ function CodexEffortPickerSeat(props: SeatProps) {
 	};
 
 	const onPointerDown = (event: PointerEvent<HTMLDivElement>): void => {
-		if (lockedNow || efforts.length === 0) return;
+		if (controlsLocked || efforts.length === 0) return;
+		// 右键/中键也会派发 pointerdown；只接受主指针的左键。
+		if (event.button !== 0 || event.isPrimary === false) return;
 		const ratio = ratioAt(event);
 		if (ratio === null) return;
 		event.preventDefault();
@@ -262,19 +384,80 @@ function CodexEffortPickerSeat(props: SeatProps) {
 		if (dragRatio === null) return;
 		const ratio = ratioAt(event);
 		setDragRatio(null);
+		if (controlsLocked) return;
 		commitEffort(snapIndex(ratio === null ? dragRatio : ratio, efforts.length));
 	};
+	/** 系统取消 / 捕获丢失：清掉拖拽态，绝不把"取消"当成松手提交。 */
+	const onPointerCancel = (): void => {
+		setDragRatio(null);
+	};
 
-	/** 键盘：焦点留在触发器上，方向键直接调档（面板是 React portal，事件仍冒泡到这里）。 */
+	/**
+	 * 键盘：Tab 在"触发器 + 面板控件"内循环，Shift+Tab 逐级退出/关闭；
+	 * 模型列表用上下键移动，滑杆用左右/Home/End 调档。
+	 */
 	const onRootKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
 		if (event.nativeEvent?.isComposing === true) return;
-		if (event.key === 'Escape' && open) {
+		if (!open) return;
+		if (event.key === 'Escape') {
 			event.preventDefault();
-			if (pane !== 'root') setPane('root');
+			if (pane !== 'root') backToRoot();
 			else close(true);
 			return;
 		}
-		if (!open || event.key === undefined) return;
+		const active = activeElement();
+		if (event.key === 'Tab') {
+			event.preventDefault();
+			if (event.shiftKey) {
+				if (pane !== 'root') backToRoot();
+				else close(true);
+				return;
+			}
+			if (active === searchRef.current) {
+				(modelChoices()[0] ?? modelRows()[0])?.focus();
+				return;
+			}
+			moveTab(1);
+			return;
+		}
+		if (event.key === undefined) return;
+		if (active === searchRef.current && (event.key === 'ArrowDown' || event.key === 'ArrowUp')) {
+			event.preventDefault();
+			const choices = modelChoices();
+			(event.key === 'ArrowDown' ? choices[0] : choices[choices.length - 1])?.focus();
+			return;
+		}
+		const inList = listRef.current !== null && active !== null && listRef.current.contains(active);
+		if (inList && (event.key === 'ArrowDown' || event.key === 'ArrowUp')) {
+			event.preventDefault();
+			moveModelFocus(event.key === 'ArrowDown' ? 1 : -1);
+			return;
+		}
+		if (inList && (event.key === 'Home' || event.key === 'End')) {
+			event.preventDefault();
+			const choices = modelChoices();
+			choices[event.key === 'Home' ? 0 : choices.length - 1]?.focus();
+			return;
+		}
+		if (inList) return;
+		// 模型面板里焦点在"模型名"按钮上时，上下键直接进入列表。
+		if (pane === 'model' && active === modelButtonRef.current && (event.key === 'ArrowDown' || event.key === 'ArrowUp')) {
+			event.preventDefault();
+			const choices = modelChoices();
+			const target = choices.length > 0
+				? choices[event.key === 'ArrowDown' ? 0 : choices.length - 1]
+				: modelRows()[0];
+			target?.focus();
+			return;
+		}
+		if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+			event.preventDefault();
+			moveTab(event.key === 'ArrowDown' ? 1 : -1);
+			return;
+		}
+		// Home/End/左右键只在触发器或滑杆上表示"调档"，模型名按钮上不抢键。
+		const onEffortControl = active === null || active === triggerRef.current || active === trackRef.current;
+		if (!onEffortControl) return;
 		if (event.key === 'Home') {
 			event.preventDefault();
 			commitEffort(0);
@@ -305,17 +488,19 @@ function CodexEffortPickerSeat(props: SeatProps) {
 	 * （模型声明过的那些），这里只决定"刚切过去时落在哪一格"。
 	 */
 	const chooseModel = (group: ModelGroup, model: ModelEntry): void => {
-		if (lockedNow) return;
+		if (controlsLocked) return;
 		if (model.id === current?.model && group.id === current?.provider) {
-			setPane('root');
+			backToRoot();
 			return;
 		}
 		setFailure(null);
+		// 提交期间焦点停在触发器上；模型行会因 busy 被禁用，不能让焦点留在那里。
+		triggerRef.current?.focus();
 		const selection: ModelSelection = { provider: group.id, model: model.id };
 		const levels = model.reasoning?.efforts ?? [];
 		if (levels.length > 0) selection.reasoningEffort = levels[levels.length - 1].id;
 		Promise.resolve(select(selection)).then(
-			(outcome) => settle(outcome, () => setPane('root')),
+			(outcome) => settle(outcome, backToRoot),
 			(reason: unknown) => setFailure(String(reason)),
 		);
 	};
@@ -323,12 +508,12 @@ function CodexEffortPickerSeat(props: SeatProps) {
 	// ---- 渲染 ----
 	const triggerStyle: CSSProperties = { ...styles.trigger };
 	// 打开态也上底色：否则看不出这个按钮正被按住（hover 只在悬停时给）。
-	if ((hovered || open) && !lockedNow) Object.assign(triggerStyle, styles.triggerHover);
-	if (lockedNow) Object.assign(triggerStyle, styles.triggerDisabled);
+	if ((hovered || open) && !triggerLocked) Object.assign(triggerStyle, styles.triggerHover);
+	if (triggerLocked) Object.assign(triggerStyle, styles.triggerDisabled);
 
 	const modelLineStyle: CSSProperties = { ...styles.headerModel };
-	if (modelHovered && !lockedNow) Object.assign(modelLineStyle, styles.headerModelHover);
-	if (lockedNow) Object.assign(modelLineStyle, styles.rowDisabled);
+	if (modelHovered && !controlsLocked) Object.assign(modelLineStyle, styles.headerModelHover);
+	if (controlsLocked) Object.assign(modelLineStyle, styles.rowDisabled);
 
 	const trigger = (
 		<button
@@ -341,9 +526,10 @@ function CodexEffortPickerSeat(props: SeatProps) {
 			}
 			aria-haspopup="dialog"
 			aria-expanded={open}
+			aria-controls={open ? `${id}-menu` : undefined}
 			title={`${modelLabel} · ${committedLabel ?? '默认'}`}
 			aria-busy={busy}
-			disabled={lockedNow}
+			disabled={triggerLocked}
 			style={triggerStyle}
 			onClick={() => {
 				if (open) close(true);
@@ -369,10 +555,11 @@ function CodexEffortPickerSeat(props: SeatProps) {
 			: reactDom.createPortal(
 					<primitives.MenuSurface
 						ref={menuRef}
+						id={`${id}-menu`}
 						compact={true}
 						role="dialog"
 						aria-label="模型与推理等级"
-						aria-busy={busy}
+						aria-busy={busy || state.status === 'loading'}
 						style={{ ...styles.menu, ...(menuPos ?? styles.measure) }}
 					>
 						{/* 标题区（居中，参考 Codex 的档位面板）：上面是当前档位，下面是模型名 + ›。
@@ -382,13 +569,19 @@ function CodexEffortPickerSeat(props: SeatProps) {
 								{effortLabel ?? '默认'}
 							</div>
 							<button
+								ref={modelButtonRef}
 								type="button"
 								aria-label={`选择模型，当前 ${modelLabel}`}
 								aria-haspopup="menu"
+								aria-expanded={pane === 'model'}
+								aria-controls={pane === 'model' ? `${id}-models` : undefined}
 								title={modelLabel}
-								disabled={lockedNow}
+								disabled={controlsLocked}
 								style={modelLineStyle}
-								onClick={() => setPane('model')}
+								onClick={() => {
+									setQuery('');
+									setPane('model');
+								}}
 								{...modelHoverHandlers}
 							>
 								<span style={styles.headerModelText}>{modelLabel}</span>
@@ -410,23 +603,36 @@ function CodexEffortPickerSeat(props: SeatProps) {
 								previewIndex={previewIndex}
 								shownRatio={shownRatio}
 								dragging={dragRatio !== null}
-								locked={lockedNow}
+								locked={controlsLocked}
 								onPointerDown={onPointerDown}
 								onPointerMove={onPointerMove}
 								onPointerUp={onPointerUp}
+								onPointerCancel={onPointerCancel}
+								onLostPointerCapture={onPointerCancel}
 							/>
 						)}
 
 						{/* 模型列表（下钻时） */}
 						{pane === 'model' ? (
 							<div style={styles.list}>
-								<Row onClick={() => setPane('root')}>
-									<primitives.IconChevronLeftOutlineRegular size={14} style={styles.chevron} />
-									<span style={styles.caption}>返回</span>
-								</Row>
-								{state.groups
-									.filter((group) => group.models.length > 0)
-									.map((group) => (
+								{showSearch ? (
+									<input
+										ref={searchRef}
+										type="search"
+										aria-label="搜索模型"
+										aria-controls={`${id}-models`}
+										placeholder="搜索模型…"
+										value={query}
+										onChange={(event) => setQuery(event.target.value)}
+										style={styles.search}
+									/>
+								) : null}
+								<div ref={listRef} id={`${id}-models`} role="menu" aria-label="模型列表">
+									<Row role="menuitem" onClick={backToRoot}>
+										<primitives.IconChevronLeftOutlineRegular size={14} style={styles.chevron} />
+										<span style={styles.caption}>返回</span>
+									</Row>
+									{filteredGroups.map((group) => (
 										<div
 											key={group.id}
 											role="group"
@@ -442,6 +648,9 @@ function CodexEffortPickerSeat(props: SeatProps) {
 											</div>
 											{group.models.map((model) => {
 												const isCurrent = current?.provider === group.id && current?.model === model.id;
+												const isPending = busy
+													&& state.pending?.provider === group.id
+													&& state.pending?.model === model.id;
 												const levels = model.reasoning?.efforts ?? [];
 												// 当前模型显示会话正在用的档位；其它模型显示**选中它会带上的那一档**
 												// （= 该模型的最高档，见 chooseModel）。
@@ -459,7 +668,7 @@ function CodexEffortPickerSeat(props: SeatProps) {
 														key={`${group.id}/${model.id}`}
 														role="menuitemradio"
 														checked={isCurrent}
-														disabled={lockedNow}
+														disabled={controlsLocked}
 														// 组名已经可见，provider 仍然留在读屏标签里：读屏按行的顺序念，
 														// 不依赖"组标题被念过"这件事，同名模型来自不同 provider 也分得清。
 														ariaLabel={`${model.name ?? model.id}，${group.name ?? group.id}`}
@@ -471,18 +680,45 @@ function CodexEffortPickerSeat(props: SeatProps) {
 															<span style={isCurrent ? styles.effortName : styles.caption}>{effortName}</span>
 														)}
 														<span style={styles.slot}>
-															{isCurrent ? <primitives.IconCheckOutlineRegular size={14} /> : null}
+															{isPending ? (
+																<primitives.StateDot state="ongoing" />
+															) : isCurrent ? (
+																<primitives.IconCheckOutlineRegular size={14} />
+															) : null}
 														</span>
 													</Row>
 												);
 											})}
 										</div>
 									))}
+								</div>
+								{filteredGroups.length === 0 && failures.length === 0 ? (
+									<div style={styles.notice} role="status">
+										{normalizedQuery !== ''
+											? '没有匹配的模型'
+											: state.status === 'loading'
+												? '正在载入模型…'
+												: '暂无可用模型'}
+									</div>
+								) : null}
+								{failures.map((entry) => (
+									<div key={`failure-${entry.id}`} style={styles.failureRow} role="status">
+										<span style={styles.modelName}>{entry.name ?? entry.id}</span>
+										<span style={styles.caption}>{entry.message}</span>
+									</div>
+								))}
 							</div>
 						) : null}
 
 						{/* 失败提示（选择被拒时保留面板） */}
-						{message === null ? null : <div style={styles.error}>{message}</div>}
+						{message === null ? null : (
+							<div style={styles.error} role="status">
+								<span>{message}</span>
+								{failure === null && state.error !== null ? (
+									<button type="button" style={styles.retry} onClick={load}>重试</button>
+								) : null}
+							</div>
+						)}
 					</primitives.MenuSurface>,
 					document.body,
 				);
@@ -492,6 +728,7 @@ function CodexEffortPickerSeat(props: SeatProps) {
 			ref={rootRef}
 			style={styles.root}
 			onKeyDown={onRootKeyDown}
+			onBlur={onRootBlur}
 			onMouseDown={(event) => {
 				if (event.target instanceof Element && event.target.closest('button') !== null) {
 					event.preventDefault();

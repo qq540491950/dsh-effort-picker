@@ -40,6 +40,13 @@ export interface ModelSelection {
 	reasoningEffort?: string;
 }
 
+/** 一个 provider 的目录加载失败；可用分组仍然可用，失败行只做提示。 */
+export interface ModelFailure {
+	id: string;
+	name?: string;
+	message: string;
+}
+
 /** 目录快照：`directory.store.getSnapshot()` 的返回值，也是 `useSyncExternalStore` 的源。 */
 export interface DirectorySnapshot {
 	/** 'ready' / 'loading' … 这里只用到 'loading' 一个值做文案。 */
@@ -48,13 +55,14 @@ export interface DirectorySnapshot {
 	/** 还没有 current 时（目录没载入完）先显示的档位。 */
 	retainedEffort?: string;
 	groups: ModelGroup[];
-	/** 非 null 表示有一次选择正在进行。 */
-	pending: unknown;
+	/** 正在提交的选择；null 表示没有进行中的选择。 */
+	pending: ModelSelection | null;
 	/** 上一次操作的失败文案（已经是给人看的字符串）。 */
 	error: string | null;
 	/** 官方快照里还有这两个字段；本插件不读，写出来是为了让夹具能如实构造快照。 */
 	routable?: boolean;
-	failures?: unknown[];
+	/** 上一次目录加载中按 provider 失败的条目；可用分组不受影响。 */
+	failures?: ModelFailure[];
 }
 
 /** `directory.select()` 的结果：`ok: false` 时 `error.code` 决定提示语。 */

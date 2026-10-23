@@ -28,6 +28,7 @@ Codex 风格的推理档位面板。
 | `cordis.patch.yml` | bundle 自带的补丁层：`insert` 一行把本插件接进 Loader（`dsh.bundle.patch` 指向它） | 中——写错等于"装了却没生效" |
 | `lib/client.js` / `lib/index.js` | **产物**，不要手改 | 手改会被下次构建覆盖，且自检第 1 组会报"产物与源码不一致" |
 | `tools/verify.ts` | 离线自检：纯 Node、无依赖，用 `node:vm` 跑**真实的** `lib/client.js` | 低；改它必须同步改断言，**不许为了让它变绿而放宽断言** |
+| `tests/**` / `vitest.config.ts` / `tsconfig.test.json` | 真实 React + jsdom 的交互测试（焦点、Tab、pending、拖拽、失败态） | 中；测试只允许进 `devDependencies`，不得进产物 `require` 面 |
 | `README.md` | 面向使用者的介绍与使用说明 | 低 |
 | `AGENTS.md` | 本文件（工程约束） | 低 |
 
@@ -127,13 +128,17 @@ bundle → Host 在 `/plugins` 下发布并写进浏览器 boot graph。
 - `dsh.client.platform`：`"web"`。
 - `dsh.bundle.patch`：`"./cordis.patch.yml"`——声明"本包是 bundle，接线在仓内这一层"。
   安装器据此把本包写进 profile 的 `dsh.profile.bundles`，profile 不再需要手写路径行。
+- `engines.dsh`：声明支持的 DSH 版本范围（当前 `>=0.2.0-rc.2 <0.3.0`）。没有它时安装器会回退到
+  `@deepseek-ai/dsh*` peer 检查；本包只声明了 `@deepseek-ai/cordis`，等于没有版本闸门。
 
 ## 5. 改动流程（做完算数才算完）
 
 1. 改 `src/**`（TS/TSX 源码）。**不要**改 `lib/`。
-2. **类型检查**：`npm run typecheck`（`src/` 与 `tools/` 两份 tsconfig 都要过）。
+2. **类型检查**：`npm run typecheck`（`src/`、`tools/`、`tests/` 三份 tsconfig 都要过）。
 3. **构建**：`npm run build`（`src/` → `lib/client.js` + `lib/index.js`，原子替换 + 写清单）。
-4. **跑自检**：
+4. **跑交互测试**：`npm run test`（Vitest + jsdom，覆盖焦点/Tab/Shift+Tab/Esc/pending/拖拽取消/搜索/空态失败态）。
+
+5. **跑自检**：
 
    ```powershell
    node tools/verify.ts
@@ -142,13 +147,15 @@ bundle → Host 在 `/plugins` 下发布并写进浏览器 boot graph。
    可选参数：`--patch <profile 的 cordis.patch.yml 路径>` 校验"profile 接线了没有"——手写 insert 行
    或把本包列进 `dsh.profile.bundles`，两种形态都算通过；再带 `--yaml <yaml 包目录>` 用真实 YAML
    解析器校验（该目录需有 `dist/index.js`）。
-5. **必须看到 `全部通过 ✓` 且退出码 0**。失败时会打印 `失败 N 项：` 并 `exit 1`。
-6. 只有第 5 步过了才有资格说"改好了"。**禁止**在没跑自检、或自检失败的情况下汇报成功；也禁止用
-   "看起来没问题"替代实际输出。
-7. 提交（第 6 节）并推送。
+6. **必须看到 verify 的 `全部通过 ✓`、测试的 `10 passed`，且退出码 0**。失败时 verify 会打印
+   `失败 N 项：` 并 `exit 1`。
+7. 只有第 6 步过了才有资格说"改好了"。**禁止**在没跑自检/测试、或它们失败的情况下汇报成功；
+   也禁止用"看起来没问题"替代实际输出。
+8. 提交（第 6 节）并推送。
 
 自检覆盖 16 个分组（含 `4b` 降级、`8b` 连续跟手、`8c` 档位未设置时的滑块头、`11b` 面板落位）共 124 条
-断言（带 `--patch` 时 126 条）：包清单契约与**构建新鲜度**（`src/` 改了没构建会直接失败，新增文件与
+断言（带 `--patch` 时 126 条）；另有一套 Vitest + jsdom 交互测试（10 条）覆盖 verify 结构上看不到的
+焦点、portal、Tab 顺序、pending 和拖拽取消。verify 自身覆盖的是包清单契约与**构建新鲜度**（`src/` 改了没构建会直接失败，新增文件与
 纯类型文件也算）、宿主 `apply`、
 模块协议（含"产物只向平台要种子模块"）、`priority -1` 注册与注入清单回归护栏、`resolve()` 解析、解析失败
 时座位内降级（不退役条目、上报控制台、排自动重试）、子代理会话短路、触发器文案（含"不放前导图标、
@@ -173,7 +180,7 @@ id / name 与**本机实际路径**核对，所以**仓库搬家后要么重新�
 
 | 症状 | 原因 | 恢复 |
 |---|---|---|
-| 界面里模型控件整个没了 | 条目被退役（2.1 / 2.3） | 重新 `npm run build`（内容不变也行，mtime/size 变了宿主就会发新 rev），或 `Ctrl+R` 刷新页面。不必重启 DSH |
+| 界面里模型控件整个没了 | 条目被退役（2.1 / 2.3） | `npm run build:force`（内容不变也重写产物，mtime/ctime 变了宿主才会发新 rev），或 `Ctrl+R` 刷新页面。不必重启 DSH |
 | 想看到失败原因 | — | 读 `localStorage["dsh-effort-picker:last-failure"]`，或看控制台 `[dsh-effort-picker]` 前缀（只有第一条） |
 | 想立刻回到官方控件 | — | bundle 形态用 `plugin_manager` 的 `set_bundle`（`enabled: false`）或 `remove_bundle`；手写形态删掉 `id: dsh-effort-picker` 那个 insert 行。官方选择器立刻回来 |
 
@@ -186,7 +193,7 @@ profile 是**用户的环境**，不是本仓库的一部分：`C:\Users\admin\.
 `package.json` 依赖、`dsh.profile.bundles` 以及 Loader 行都由安装器写——本仓库只提供
 `cordis.patch.yml` 那一层，不碰用户的其它配置。spec 有两种形态，装的是同一个包：
 
-- `github:qq540491950/dsh-effort-picker#v0.0.4`：**成品形态**，钉 tag（必须等于 `package.json` 的
+- `github:qq540491950/dsh-effort-picker#v0.0.5`：**成品形态**，钉 tag（必须等于 `package.json` 的
   `version`），profile 里是拷贝；
 - `D:\project\dsh-plugins\dsh-effort-picker`：**开发形态**，profile 里是 junction，`npm run build` 即刻生效。
 
@@ -213,5 +220,6 @@ profile 是**用户的环境**，不是本仓库的一部分：`C:\Users\admin\.
   bundle 形态下由安装器写下的 `file:` 依赖指向它，仓库搬家仍需重新安装）。
 - profile 补丁：`C:\Users\admin\.dsh\profiles\desktop\cordis.patch.yml`。
 - Node：v24.15.0（`tools/build.ts` 靠 Node 原生类型剥离直接跑 `.ts`，所以构建脚本只能写可擦除语法——
-  `tsconfig.tools.json` 的 `erasableSyntaxOnly` 守着这条）；pnpm 12.14.0；TypeScript 5.9.3；esbuild 0.28.2。
+  `tsconfig.tools.json` 的 `erasableSyntaxOnly` 守着这条）；pnpm 12.14.0；TypeScript 5.9.3；esbuild 0.28.2；
+  Vitest 5.0.5 / Vite 8.3.5 / jsdom 30.1.3（只在 devDependencies，不进产物）。
 - 目标座位：`conversation.input.model`；被遮蔽的官方插件：`@deepseek-ai/dsh-client-ui-model-selection`。
