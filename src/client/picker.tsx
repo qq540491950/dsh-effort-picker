@@ -175,9 +175,9 @@ function CodexEffortPickerSeat(props: SeatProps) {
 		}
 		return nodes;
 	};
-	/** 模型列表里的可聚焦行（含"返回"），用于方向键/Tab 导航。 */
+	/** 模型列表里的可聚焦行，用于方向键/Tab 导航。 */
 	const modelRows = (): HTMLElement[] => queryAll(listRef.current, 'button:not([disabled])');
-	/** 只含模型行（不含"返回"）；进入面板/Home/End 优先落在这里。 */
+	/** 只含模型行；进入面板/Home/End 优先落在这里。 */
 	const modelChoices = (): HTMLElement[] => queryAll(listRef.current, '[role="menuitemradio"]:not([disabled])');
 
 	// ---- 副作用（无条件调用，早退放最后）----
@@ -222,7 +222,7 @@ function CodexEffortPickerSeat(props: SeatProps) {
 		return autoUpdate(trigger, menu, update);
 	}, [open, pane, efforts.length]);
 
-	// 进入模型列表时把焦点落到当前行（或第一行）；返回根面板由 backToRoot() 负责。
+	// 进入模型列表时把焦点落到当前行（或第一行）；退回根面板由 Esc/Shift+Tab 负责。
 	react.useEffect(() => {
 		if (!open || pane !== 'model') return undefined;
 		const checked = listRef.current?.querySelector<HTMLElement>(
@@ -278,7 +278,7 @@ function CodexEffortPickerSeat(props: SeatProps) {
 		nodes[next]?.focus();
 	};
 
-	/** 在模型行（含"返回"）之间循环移动焦点。 */
+	/** 在模型行之间循环移动焦点。 */
 	const moveModelFocus = (direction: 1 | -1): void => {
 		const rows = modelRows();
 		if (rows.length === 0) return;
@@ -604,10 +604,6 @@ function CodexEffortPickerSeat(props: SeatProps) {
 						{pane === 'model' ? (
 							<div style={styles.list} data-dsh-effort-picker-list>
 								<div ref={listRef} id={`${id}-models`} role="menu" aria-label="模型列表">
-									<Row role="menuitem" onClick={backToRoot}>
-										<primitives.IconChevronLeftOutlineRegular size={14} style={styles.chevron} />
-										<span style={styles.caption}>返回</span>
-									</Row>
 									{groups.map((group) => (
 										<div
 											key={group.id}

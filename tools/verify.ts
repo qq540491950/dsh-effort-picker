@@ -973,6 +973,12 @@ check(
 		!textOf(modelDialog).includes('Medium'),
 	String(findAll(modelDialog, (node) => node.props?.role === 'slider').length),
 );
+// 模型页不再有"返回"按钮：退回根面板用 Esc / Shift+Tab，或直接选模型。
+check(
+	'模型列表不再渲染"返回"按钮',
+	!textOf(modelDialog).includes('返回'),
+	textOf(modelDialog),
+);
 // 列表**按 provider 分组**：每组一行可见组名。用户配置的第三方路由（cpa / huawei …）
 // 与官方 provider 的模型混在同一个列表里，只靠 aria-label 的时候肉眼分不出谁家的
 // （实测反馈：分组要加回来）。分组必须是**结构性**的——模型行装在组里，不是随便多印一行字。
