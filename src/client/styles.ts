@@ -110,7 +110,6 @@ export const styles = {
 	headerModelHover: { color: 'var(--dsw-alias-label-primary)' },
 	headerModelText: { minWidth: 0, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' },
 	caption: { color: 'var(--dsw-alias-label-secondary)', fontSize: '12px' },
-	effortName: { color: 'var(--dsw-alias-brand-primary)', fontSize: '13px', fontWeight: 500 },
 	track: {
 		position: 'relative',
 		// 轨道高度与 THUMB_SIZE 是同一套比例，数值来自参考图（Codex 的档位面板）：
@@ -192,26 +191,31 @@ export const styles = {
 	},
 	/** 拖动中的圆钮：只把内侧描边加深一点（`track.tsx` 按 `dragging` 切），不做光晕。 */
 	thumbActive: { boxShadow: 'inset 0 0 0 1px rgba(0, 0, 0, .18)' },
-	// 一个 provider 分组：一行可见组名 + 该 provider 的模型行。**不是卡片**——没有底色、
-	// 没有边框、没有圆角容器，组名只是个标题行；早先被撤掉的是 provider 圆角卡片
-	// （border-l3 + radius + 掺色底），别把组名重新做回卡片。
-	group: { display: 'flex', flexDirection: 'column', gap: '2px' },
-	// 组名（provider）：用户配置的第三方路由与官方 provider 的模型混在一个列表里，
-	// 只靠 aria-label 时肉眼分不出"这个模型是谁家的"（实测反馈：分组要加回来）。
-	//
-	// 它不是卡片标题，而是**分节标题**：比模型行浅一档（label-secondary）、加字重与字距，
-	// 右侧一条 1px 细线吃掉剩余宽度，末端跟组内模型数。留白（上 12px / 下 4px）与细线
-	// 才是"分组"的主要信号——只有一行浅色小字时，三组会连成一片（实测反馈：分组不明显）。
-	// 上内边距刻意大于下内边距：上一组末行 → 组名 = 14px，组名 → 本组首行 = 6px。
-	groupLabel: {
+	// 一个 provider 分组：一条通栏分节条 + 该 provider 的模型行。
+	// **组容器本身仍然不是卡片**——没有底色、边框、圆角；底色只出现在 groupHead 这条
+	// 通栏色带上（左右各 -12px 抵消面板 padding，直角、无边框）。早先被撤掉的是
+	// provider 圆角卡片（border-l3 + radius + 掺色底），别把整组重新做回卡片。
+	group: { display: 'flex', flexDirection: 'column', gap: '2px', marginTop: '8px' },
+	// 分组条（provider）：全宽、吸顶。224px 的面板里只靠一行浅色小字分组不够
+	// （实测反馈两次「分组不明显」），所以升级成真正的分节头条带：
+	//   · 横向用负 margin 吃掉面板 12px padding，视觉上从一边到另一边；
+	//   · 底色 = 菜单面同色（bg-layer-2）掺 6% label-primary，滚动时能盖住下方行；
+	//   · 直角、无边框，不构成卡片。
+	groupHead: {
+		position: 'sticky',
+		top: 0,
+		zIndex: 2,
 		display: 'flex',
 		alignItems: 'center',
 		gap: '8px',
-		padding: '12px 8px 4px',
-		lineHeight: '16px',
+		margin: '0 -12px',
+		padding: '5px 20px',
+		background: 'color-mix(in srgb, var(--dsw-alias-label-primary) 6%, var(--dsw-alias-bg-layer-2))',
+		borderTop: '1px solid color-mix(in srgb, var(--dsw-alias-label-primary) 6%, transparent)',
+		borderBottom: '1px solid color-mix(in srgb, var(--dsw-alias-label-primary) 6%, transparent)',
 		userSelect: 'none',
 	},
-	// 组名文字：flex 子项自己负责省略号（容器不能 overflow:hidden，否则会把细线一起裁掉）。
+	// 组名文字：flex 子项自己负责省略号（条本身不能 overflow:hidden，否则会裁掉吸顶内容）。
 	groupLabelText: {
 		minWidth: 0,
 		overflow: 'hidden',
@@ -221,17 +225,12 @@ export const styles = {
 		fontSize: '11px',
 		fontWeight: 600,
 		letterSpacing: '0.03em',
+		lineHeight: '16px',
 	},
-	// 组名右侧的拉伸细线：掺 label-primary 而不是裸 bg-layer，
-	// 否则在深色主题里与菜单面同色（轨道那条踩过同样的坑）。
-	groupRule: {
-		flex: 1,
-		height: '1px',
-		background: 'color-mix(in srgb, var(--dsw-alias-label-primary) 12%, transparent)',
-	},
-	// 组内模型数：退回 tertiary，不和组名抢；tabular-nums 让各组的数字右端对齐。
+	// 组内模型数：靠右，退回 tertiary，不和组名抢；tabular-nums 让数字右端对齐。
 	groupCount: {
 		flex: 'none',
+		marginLeft: 'auto',
 		color: 'var(--dsw-alias-label-tertiary)',
 		fontSize: '10px',
 		fontWeight: 400,
@@ -239,13 +238,15 @@ export const styles = {
 		lineHeight: '16px',
 		fontVariantNumeric: 'tabular-nums',
 	},
-	// 组内每一行仍是**平铺**的（无卡片）：视觉上只留"模型名 + 档位 + 勾"。
+	// 组内每一行是 Codex 式的**两行行项目**：模型名 + 一行说明（当前/选中后 档位）。
+	// 把档位从行尾挪进副行后，224px 下模型名不再被 High/Max 挤成省略号；
+	// provider 归吸顶分节条负责，副行不再重复它（长 provider 名会把档位截掉）。
 	rowButton: {
 		display: 'flex',
 		alignItems: 'center',
 		gap: '8px',
 		width: '100%',
-		padding: '7px 8px',
+		padding: '6px 8px',
 		border: 'none',
 		borderRadius: '6px',
 		background: 'transparent',
@@ -254,6 +255,18 @@ export const styles = {
 		textAlign: 'left',
 		cursor: 'pointer',
 		transition: 'background .1s ease',
+	},
+	// 行的两行主体：主行（模型名）+ 副行（provider · 当前/选中后 档位）。
+	rowBody: { display: 'flex', flexDirection: 'column', gap: '1px', flex: 1, minWidth: 0 },
+	// 副行：11px/14，tertiary。没有档位的模型写「无档位」（不撒谎）。
+	rowDesc: {
+		minWidth: 0,
+		overflow: 'hidden',
+		whiteSpace: 'nowrap',
+		textOverflow: 'ellipsis',
+		color: 'var(--dsw-alias-label-tertiary)',
+		fontSize: '11px',
+		lineHeight: '14px',
 	},
 	// 半透明菜单面上不要用 bg-layer-2（和面板几乎同色，看不出 hover）。
 	rowHover: { background: 'color-mix(in srgb, var(--dsw-alias-label-primary) 7%, transparent)' },
@@ -284,7 +297,14 @@ export const styles = {
 		font: 'inherit',
 		fontSize: '12px',
 	},
-	modelName: { flex: 1, minWidth: 0, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' },
+	modelName: {
+		minWidth: 0,
+		overflow: 'hidden',
+		whiteSpace: 'nowrap',
+		textOverflow: 'ellipsis',
+		fontSize: '13px',
+		lineHeight: '18px',
+	},
 	/** 行尾那一格：勾选图标，没有勾选时留同样宽的空格，保证模型名左对齐。 */
 	slot: { width: '18px', flex: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'flex-end' },
 	notice: { color: 'var(--dsw-alias-label-secondary)', fontSize: '12px', padding: '4px 2px' },

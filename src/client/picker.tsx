@@ -639,16 +639,15 @@ function CodexEffortPickerSeat(props: SeatProps) {
 											aria-label={group.name ?? group.id}
 											style={styles.group}
 										>
-											{/* 组名（provider）可见：用户配置的第三方路由（cpa / huawei / tengxun…）
-											    与官方 provider 的模型混在同一个列表里，没有这一行就分不出"这个模型是
-											    谁家的"（实测反馈）。它只是标题行，不是可选行；`role="group"` 上的
-											    aria-label 已经念过同一个名字，所以视觉标题（含右侧的模型数）对读屏隐藏，
-											    避免重复播报。细线与模型数是"分组"的主要视觉信号，不是装饰。 */}
-											<div style={styles.groupLabel}>
+											{/* 分节条（provider）：用户配置的第三方路由（cpa / huawei / tengxun…）与官方
+											    provider 的模型混在同一个列表里，只靠行内 aria-label 时肉眼分不出"这个模型
+											    是谁家的"（实测反馈）。它是通栏、吸顶的色带，不是可选行、也不是卡片；
+											    `role="group"` 上的 aria-label 已经念过同一个名字，所以视觉标题（含数量）
+											    对读屏隐藏，避免重复播报。 */}
+											<div style={styles.groupHead}>
 												<span style={styles.groupLabelText} aria-hidden="true">
 													{group.name ?? group.id}
 												</span>
-												<span style={styles.groupRule} aria-hidden="true" />
 												<span style={styles.groupCount} aria-hidden="true">
 													{String(group.models.length)}
 												</span>
@@ -670,22 +669,38 @@ function CodexEffortPickerSeat(props: SeatProps) {
 													? (current?.reasoningEffort ?? model.reasoning?.defaultEffort ?? appliedEffort)
 													: appliedEffort;
 												const effortName = levels.find((level) => level.id === effortId)?.name ?? effortId;
+												// 档位是兜底出来的时候补「（默认）」——与触发器/顶栏同一套说法，
+												// 不把兜底档说成用户显式选过的档位。
+												const effortDefaulted = isCurrent
+													&& (current?.reasoningEffort === undefined || current?.reasoningEffort === null);
+												const effortLabel = effortName === undefined
+													? undefined
+													: effortDefaulted
+														? `${effortName}（默认）`
+														: effortName;
+												const providerName = group.name ?? group.id;
+												// 副行只说"这一行现在/选中后会怎样"。provider 由吸顶分节条负责，
+												// 不再重复写进每一行——长 provider 名 + 档位在 224px 下会把档位截掉
+												// （实测：「DeepSeek 官方 · 选中后 Max」最后只剩省略号）。
+												const description = effortLabel === undefined
+													? '无档位'
+													: `${isCurrent ? '当前' : '选中后'} ${effortLabel}`;
 												return (
 													<Row
 														key={`${group.id}/${model.id}`}
 														role="menuitemradio"
 														checked={isCurrent}
 														disabled={controlsLocked}
-														// 组名已经可见，provider 仍然留在读屏标签里：读屏按行的顺序念，
-														// 不依赖"组标题被念过"这件事，同名模型来自不同 provider 也分得清。
-														ariaLabel={`${model.name ?? model.id}，${group.name ?? group.id}`}
+														// 读屏按行的顺序念，不依赖"组标题被念过"；provider 仍写进整句，
+														// 同名模型来自不同 provider 时也分得清。
+														ariaLabel={`${model.name ?? model.id}，${providerName}，${description}`}
 														title={levels.length === 0 ? undefined : `${String(levels.length)} 档可选`}
 														onClick={() => chooseModel(group, model)}
 													>
-														<span style={styles.modelName}>{model.name ?? model.id}</span>
-														{effortName === undefined ? null : (
-															<span style={isCurrent ? styles.effortName : styles.caption}>{effortName}</span>
-														)}
+														<span style={styles.rowBody}>
+															<span style={styles.modelName}>{model.name ?? model.id}</span>
+															<span style={styles.rowDesc}>{description}</span>
+														</span>
 														<span style={styles.slot}>
 															{isPending ? (
 																<primitives.StateDot state="ongoing" />

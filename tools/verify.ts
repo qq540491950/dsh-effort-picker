@@ -990,7 +990,7 @@ check(
 	String(groupNodes.map((group) => String(group.type)).join(' | ')),
 );
 // 组名可见（视觉上真印出来），但比模型行浅：label-secondary ↔ 模型行 label-primary。
-// 组名那一行里还有两个 aria-hidden 的元素：右侧 1px 分隔线与组内模型数。
+// 分节条里还有两个 aria-hidden 的元素：组名与组内模型数（顺序即文档顺序）。
 const groupHiddenNodes = (group: FakeElement): FakeElement[] =>
 	findAll(group, (node) => node.props?.['aria-hidden'] === 'true');
 const groupLabelText = (group: FakeElement): string => textOf(groupHiddenNodes(group)[0] ?? null);
@@ -1011,12 +1011,17 @@ check(
 	groupLabelStyle.includes('label-secondary') && groupLabelStyle.includes('fontWeight: 600'),
 	groupLabelStyle.replace(/\s+/g, ' ').trim(),
 );
-// 只有一行浅色小字时三组会连成一片（实测反馈：分组不明显），所以组名右侧还要有分隔线。
-const groupRuleStyle = /groupRule:\s*\{([^{}]*)\}/.exec(clientSource)?.[1] ?? '';
+// 只靠一行浅色小字时三组会连成一片（实测反馈两次「分组不明显」），所以组名升级成
+// **通栏、吸顶的分节条**：左右负 margin 吃掉面板 padding，底色是菜单面掺 label-primary；
+// 仍然不是卡片——直角、无边框。
+const groupHeadStyle = /groupHead:\s*\{([^{}]*)\}/.exec(clientSource)?.[1] ?? '';
 check(
-	'组名右侧有 1px 分隔线（掺 label-primary）',
-	groupRuleStyle.includes('1px') && groupRuleStyle.includes('label-primary'),
-	groupRuleStyle.replace(/\s+/g, ' ').trim(),
+	'分组条是通栏吸顶色带（无圆角，不是卡片）',
+	groupHeadStyle.includes('sticky') &&
+		groupHeadStyle.includes('margin: "0 -12px"') &&
+		groupHeadStyle.includes('background') &&
+		!groupHeadStyle.includes('borderRadius'),
+	groupHeadStyle.replace(/\s+/g, ' ').trim(),
 );
 // 组内模型数：两组都必须等于组里的行数，不能写死。
 check(
@@ -1024,6 +1029,16 @@ check(
 	groupCountText(groupNodes[0]) === String(rowsIn(groupNodes[0]).length) &&
 		groupCountText(groupNodes[1]) === String(rowsIn(groupNodes[1]).length),
 	`${groupCountText(groupNodes[0])}/${String(rowsIn(groupNodes[0]).length)} | ${groupCountText(groupNodes[1])}/${String(rowsIn(groupNodes[1]).length)}`,
+);
+// 每行是 Codex 式两行：主行模型名 + 副行「当前/选中后 档位」。
+// provider 由吸顶分节条负责（行内 aria-label 仍然带着，见下面的断言）。
+const rowTexts = modelRows.map((row) => textOf(row));
+check(
+	'每行副标题带当前/选中后态',
+	rowTexts[0].includes('当前') &&
+		rowTexts[1].includes('选中后') &&
+		rowTexts[3].includes('选中后'),
+	rowTexts.join(' | '),
 );
 // 组名只做分隔，不做卡片：组容器没有边框、没有底色、没有圆角。
 const groupStyle = /(?<![A-Za-z])group:\s*\{([^{}]*)\}/.exec(clientSource)?.[1] ?? '';
