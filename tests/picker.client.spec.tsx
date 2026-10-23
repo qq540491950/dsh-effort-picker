@@ -74,7 +74,8 @@ describe('CodexEffortPicker interaction', () => {
 
 		await user.keyboard('{Shift>}{Tab}{/Shift}');
 		expect(screen.getByRole('dialog')).toBeInTheDocument();
-		expect(modelButton).toHaveFocus();
+		// 根面板标题区是重新挂载的，旧引用已脱离 DOM，必须重新查询。
+		expect(screen.getByRole('button', { name: /选择模型，当前/ })).toHaveFocus();
 
 		await user.keyboard('{Shift>}{Tab}{/Shift}');
 		expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
@@ -153,7 +154,7 @@ describe('CodexEffortPicker interaction', () => {
 		outside.remove();
 	});
 
-	it('pending 时行与滑杆禁用，焦点留在触发器', async () => {
+	it('pending 时行禁用、模型页不显示滑杆，完成后回根面板', async () => {
 		const user = userEvent.setup();
 		const directory = createModelDirectory();
 		let release: ((value: { ok: true }) => void) | undefined;
@@ -177,7 +178,8 @@ describe('CodexEffortPicker interaction', () => {
 		expect(trigger).toHaveFocus();
 		expect(row).toBeDisabled();
 		expect(row.querySelector('[data-state="ongoing"]')).not.toBeNull();
-		expect(screen.getByRole('slider', { name: '推理等级' })).toHaveAttribute('tabindex', '-1');
+		// 模型列表页不显示思考强度：标题区与滑杆整块不渲染。
+		expect(screen.queryByRole('slider', { name: '推理等级' })).not.toBeInTheDocument();
 
 		release?.({ ok: true });
 		await waitFor(() => {

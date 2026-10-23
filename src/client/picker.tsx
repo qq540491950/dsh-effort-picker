@@ -13,7 +13,7 @@
 
 import type { CSSProperties, FocusEvent, KeyboardEvent, PointerEvent } from 'react';
 import { autoUpdate, computePosition, flip, offset, shift } from '@floating-ui/dom';
-import { react, reactDom, h, primitives } from './platform';
+import { react, reactDom, h, Fragment, primitives } from './platform';
 import { SeatBoundary } from './boundary';
 import { Row } from './row';
 import { EffortTrack } from './track';
@@ -81,6 +81,8 @@ function CodexEffortPickerSeat(props: SeatProps) {
 	const triggerRef = react.useRef<HTMLButtonElement>(null);
 	const menuRef = react.useRef<HTMLElement>(null);
 	const modelButtonRef = react.useRef<HTMLButtonElement>(null);
+	/** 从模型页退回根面板时，等模型名按钮重新挂载后再把焦点交给它。 */
+	const restoreModelFocus = react.useRef(false);
 	const listRef = react.useRef<HTMLDivElement>(null);
 	const trackRef = react.useRef<HTMLDivElement>(null);
 	const thumbRef = react.useRef<HTMLSpanElement>(null);
@@ -230,6 +232,18 @@ function CodexEffortPickerSeat(props: SeatProps) {
 		return undefined;
 	}, [open, pane]);
 
+	// 从模型页退回根面板后，标题区刚重新挂载，焦点交给"模型名"按钮。
+	// 关闭面板时清掉标记，避免下次打开被这条 effect 抢走触发器的焦点。
+	react.useEffect(() => {
+		if (!open) {
+			restoreModelFocus.current = false;
+			return;
+		}
+		if (pane !== 'root' || !restoreModelFocus.current) return;
+		restoreModelFocus.current = false;
+		modelButtonRef.current?.focus();
+	}, [open, pane]);
+
 	// available === false 出现在被寻址的子代理会话上：与官方一致，什么都不渲染。
 	if (!available) return null;
 
@@ -278,8 +292,11 @@ function CodexEffortPickerSeat(props: SeatProps) {
 
 	/** 从模型列表退回根面板，并把焦点交给"模型名"按钮。 */
 	const backToRoot = (): void => {
+		// 根面板的标题区（模型名按钮）在模型页是**整块卸载**的，所以不能在这里
+		// 立刻 focus（ref 还是 null）。打一个标记，等 pane 变回 root、按钮重新挂载后
+		// 由下面的 effect 聚焦。 */
+		restoreModelFocus.current = true;
 		setPane('root');
-		queueMicrotask(() => modelButtonRef.current?.focus());
 	};
 
 	/**
@@ -532,8 +549,11 @@ function CodexEffortPickerSeat(props: SeatProps) {
 						aria-busy={busy || state.status === 'loading'}
 						style={{ ...styles.menu, ...(menuPos ?? styles.measure) }}
 					>
+						{pane === 'root' ? (
+							<>
 						{/* 标题区（居中，参考 Codex 的档位面板）：上面是当前档位，下面是模型名 + ›。
-						    模型名本身就是"下钻到模型列表"的入口——原来面板底部那一行已经并到这里。 */}
+						    模型名本身就是"下钻到模型列表"的入口——原来面板底部那一行已经并到这里。
+						    下钻到模型列表时整块隐藏：选择模型时不显示思考强度（用户 2026-10-24 明确目标）。 */}
 						<div style={styles.header}>
 							<div style={styles.headerTitle} title={effortLabel ?? '默认'}>
 								{effortLabel ?? '默认'}
@@ -543,8 +563,7 @@ function CodexEffortPickerSeat(props: SeatProps) {
 								type="button"
 								aria-label={`选择模型，当前 ${modelLabel}`}
 								aria-haspopup="menu"
-								aria-expanded={pane === 'model'}
-								aria-controls={pane === 'model' ? `${id}-models` : undefined}
+								aria-expanded={false}
 								title={modelLabel}
 								disabled={controlsLocked}
 								style={modelLineStyle}
@@ -578,6 +597,8 @@ function CodexEffortPickerSeat(props: SeatProps) {
 								onLostPointerCapture={onPointerCancel}
 							/>
 						)}
+							</>
+						) : null}
 
 						{/* 模型列表（下钻时） */}
 						{pane === 'model' ? (

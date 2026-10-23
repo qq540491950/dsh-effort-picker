@@ -964,6 +964,15 @@ modelTree = modelSeat.render();
 const modelRows = findByRole(modelTree, 'menuitemradio');
 check('模型列表渲染出 4 个模型（两个 provider）', modelRows.length === 4, String(modelRows.length));
 check('当前模型被标记为选中', modelRows[0].props.checked === true, String(modelRows[0].props.checked));
+// 模型列表页不显示思考强度：标题区（档位大字 + 模型名）与滑杆整块不渲染。
+// 只看 dialog 子树——触发器在面板外，仍然应该显示已提交档位（Medium）。
+const modelDialog = findAll(modelTree, (node) => node.props?.role === 'dialog')[0];
+check(
+	'模型列表下钻时不渲染思考强度标题与滑杆',
+	findAll(modelDialog, (node) => node.props?.role === 'slider').length === 0 &&
+		!textOf(modelDialog).includes('Medium'),
+	String(findAll(modelDialog, (node) => node.props?.role === 'slider').length),
+);
 // 列表**按 provider 分组**：每组一行可见组名。用户配置的第三方路由（cpa / huawei …）
 // 与官方 provider 的模型混在同一个列表里，只靠 aria-label 的时候肉眼分不出谁家的
 // （实测反馈：分组要加回来）。分组必须是**结构性**的——模型行装在组里，不是随便多印一行字。

@@ -109,7 +109,7 @@ ctx.inject(["slots", "modelDirectories", "sessions", "remote", "remote.session"]
 | 面板 `width: "224px"` 与轨道 200px 同源 | 轨道不设自身宽度，撑满内容宽 = 面板宽 − 左右各 12px padding；改面板宽等于改轨道宽 | 人工 |
 | `chooseModel` 必须带上新模型的**最高档**（`efforts.at(-1).id`），既不能省略 `reasoningEffort`、也不能用路由默认档 `defaultEffort` | 省略 = 会话档位被清空 → `activeIndex = -1` → 轨道不渲染滑块头，用户看到"滑块不行"；路由默认档是"一条路由一个值"，huawei 设成 high 后连支持 max 的模型也落在 high（两条都是实测反馈）。**只影响"刚切过去落在哪一格"，滑块照旧能拖到任意档** | verify 第 10 节（含"没有 defaultEffort 的模型也要带上最高档"） |
 | 只要模型有档位，轨道上就必须画得出滑块头：`shownIndex = activeIndex >= 0 ? activeIndex : efforts.length - 1`；兜底时 `committedLabel` / `effortLabel` 补「（默认）」后缀 | 会话档位没显式设置时（官方 `/model` 切换）旧实现 `shownRatio = null` → thumb / fill 全不渲染，轨道看起来就是坏的；补后缀是为了不把兜底位置说成用户选过的档位 | verify 第 8c 组 |
-| 模型列表**不显示思考强度**：行内只有模型名 + 勾，`aria-label` 也只带 provider；档位只在根面板滑杆调整 | 用户 2026-10-24 明确目标：选择模型时不显示思考强度选择。切模型仍会带上该模型的最高档（见 `chooseModel` 那条），但不在列表里展示 | verify 第 10 节 |
+| 模型列表**不显示思考强度**：行内只有模型名 + 勾，`aria-label` 也只带 provider；**下钻到模型页时整块隐藏根面板的档位标题与滑杆**（标题区 + `EffortTrack` 只在 `pane === "root"` 渲染）；档位只在根面板滑杆调整 | 用户 2026-10-24 明确目标：选择模型时不显示思考强度选择（包括红色标题区）。切模型仍会带上该模型的最高档（见 `chooseModel` 那条），但不在列表里展示 | verify 第 10 节 |
 
 **不要顺手做的重构**：不把 `lib/` 当源码改；不给**运行期**加依赖（第三方包只能写进 `src/` 并被
 打包进产物）；不改有意的硬编码；不"美化"间距到与现状不一致。`src/` 允许多文件、允许 JSX、允许
@@ -154,8 +154,8 @@ bundle → Host 在 `/plugins` 下发布并写进浏览器 boot graph。
    也禁止用"看起来没问题"替代实际输出。
 8. 提交（第 6 节）并推送。
 
-自检覆盖 16 个分组（含 `4b` 降级、`8b` 连续跟手、`8c` 档位未设置时的滑块头、`11b` 面板落位）共 128 条
-断言（带 `--patch` 时 130 条）；另有一套 Vitest + jsdom 交互测试（10 条）覆盖 verify 结构上看不到的
+自检覆盖 16 个分组（含 `4b` 降级、`8b` 连续跟手、`8c` 档位未设置时的滑块头、`11b` 面板落位）共 129 条
+断言（带 `--patch` 时 131 条）；另有一套 Vitest + jsdom 交互测试（10 条）覆盖 verify 结构上看不到的
 焦点、portal、Tab 顺序、pending 和拖拽取消。verify 自身覆盖的是包清单契约与**构建新鲜度**（`src/` 改了没构建会直接失败，新增文件与
 纯类型文件也算）、宿主 `apply`、
 模块协议（含"产物只向平台要种子模块"）、`priority -1` 注册与注入清单回归护栏、`resolve()` 解析、解析失败
@@ -194,7 +194,7 @@ profile 是**用户的环境**，不是本仓库的一部分：`C:\Users\admin\.
 `package.json` 依赖、`dsh.profile.bundles` 以及 Loader 行都由安装器写——本仓库只提供
 `cordis.patch.yml` 那一层，不碰用户的其它配置。spec 有两种形态，装的是同一个包：
 
-- `github:qq540491950/dsh-effort-picker#v0.0.9`：**成品形态**，钉 tag（必须等于 `package.json` 的
+- `github:qq540491950/dsh-effort-picker#v0.0.10`：**成品形态**，钉 tag（必须等于 `package.json` 的
   `version`），profile 里是拷贝；
 - `D:\project\dsh-plugins\dsh-effort-picker`：**开发形态**，profile 里是 junction，`npm run build` 即刻生效。
 
