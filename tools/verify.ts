@@ -1057,6 +1057,11 @@ check(
 		rowLabels[3].includes('DeepSeek 官方'),
 	rowLabels.join(' | '),
 );
+check(
+	'模型行 aria-label 也不再带档位',
+	rowLabels.every((label) => !/(Low|Medium|High|Max|无档位)/.test(label)),
+	rowLabels.join(' | '),
+);
 // 模型行主文字仍是 label-primary（来自 bundle 源码里的 rowButton）。
 const rowButtonColor = /rowButton:\s*\{[\s\S]*?color:\s*"([^"]+)"/.exec(clientSource)?.[1] ?? '';
 check('模型行文字用 label-primary', rowButtonColor.includes('label-primary'), rowButtonColor);
@@ -1065,13 +1070,12 @@ const checkIconCount = (row: FakeElement): number =>
 	findAll(row, (node) => node.type === primitivesStub.IconCheckOutlineRegular).length;
 check('当前行行尾有勾选图标', checkIconCount(modelRows[0]) === 1, String(checkIconCount(modelRows[0])));
 check('非当前行没有勾选图标', checkIconCount(modelRows[1]) === 0, String(checkIconCount(modelRows[1])));
-check('当前模型行显示当前档位 Medium', textOf(modelRows[0]).includes('Medium'), textOf(modelRows[0]));
-// 非当前模型行显示的是"选中它会带上的那一档" = 该模型的**最高档**。
-// glm-5.3 的路由默认档是 low，但最高档是 High —— 行里必须显示 High（旧实现显示路由默认的 Low）。
+// 选择模型时**不显示思考强度**（用户 2026-10-24 明确目标）：行内只有模型名 + 勾。
+const rowTexts = modelRows.map((row) => textOf(row));
 check(
-	'其它模型行显示选中它会带上的档位（最高档 High，不是路由默认的 Low）',
-	textOf(modelRows[1]).includes('High') && !textOf(modelRows[1]).includes('Low'),
-	textOf(modelRows[1]),
+	'模型行不显示档位（选择模型时只有模型名）',
+	rowTexts.every((text) => !/(Low|Medium|High|Max)/.test(text)),
+	rowTexts.join(' | '),
 );
 modelRows[1].props.onClick();
 check('选模型提交 provider', modelHarness.calls.select[0]?.provider === 'cpa', JSON.stringify(modelHarness.calls.select[0]));

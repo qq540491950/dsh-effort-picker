@@ -104,12 +104,12 @@ ctx.inject(["slots", "modelDirectories", "sessions", "remote", "remote.session"]
 | 触发器只显示**已提交**档位（`committedLabel`）；拖动预览（`effortLabel`）只允许出现在面板标题里 | 触发器在面板外面，跟着拖动预览变会让下方控件在 Low/Medium/High 之间跳、宽度跟着抖 | verify 第 8b 组 |
 | 触发器**不放前导图标**（`IconDataOutlineRegular` 已去掉），且 `triggerEffort` 不跟 `--dsh-composer-model-text-display` 一起藏 | 位置和宽度仍与官方一致，但那枚"数据库"图标是多余的（反馈点掉）；紧凑模式官方会退化成"只剩一枚图标"，我们没图标了，档位必须留住，否则只剩一个 chevron 像坏了 | verify 第 6 节 |
 | 触发器里模型名是 `label-secondary`、档位是 `label-caption`（比模型名浅一号，**不是** brand 色） | 触发器里"模型名 · 档位"要分得出主次（反馈：档位的字浅一点） | verify 第 6 节 |
-| 模型列表**按 provider 分框**：每个 provider 一个框（`group`：1px 边框 + 8px 圆角 + 3% 底色），框头 `groupHead` 是 `group.name ?? group.id`（`label-secondary` / 11px / 600 + 组内模型数，带底部分隔线），框内是**单行**模型行（模型名 + 档位 + 勾，档位紧跟在模型名后边）；provider 同时写进每行 `ariaLabel`；空组（`models` 为空）不渲染；当前行行尾有勾、并用 `rowActive` 底色 | 用户配置的第三方路由（cpa / huawei / tengxun…）与官方 provider 的模型混在同一个列表里，只靠 `ariaLabel` 时**肉眼**分不出"这个模型是谁家的"。用户 2026-10-24 明确要求「分组使用框包起来」「思考强度放到模型后边」：现在是每个 provider 一个框、框内平铺单行；早先撤掉的是**每行一张** provider 圆角卡片，别把行做成卡片。`ariaLabel` 也照旧带 provider，读屏不依赖"组标题被念过" | verify 第 10 节 |
+| 模型列表**按 provider 分框**：每个 provider 一个框（`group`：1px 边框 + 8px 圆角 + 3% 底色），框头 `groupHead` 是 `group.name ?? group.id`（`label-secondary` / 11px / 600 + 组内模型数，带底部分隔线），框内是**单行**模型行（模型名 + 勾；**选择模型时不显示思考强度**，档位只在根面板滑杆上调整）；provider 同时写进每行 `ariaLabel`；空组（`models` 为空）不渲染；当前行行尾有勾、并用 `rowActive` 底色 | 用户配置的第三方路由（cpa / huawei / tengxun…）与官方 provider 的模型混在同一个列表里，只靠 `ariaLabel` 时**肉眼**分不出"这个模型是谁家的"。用户 2026-10-24 明确要求「分组使用框包起来」「选择模型时不显示思考强度」：现在是每个 provider 一个框、框内平铺单行；早先撤掉的是**每行一张** provider 圆角卡片，别把行做成卡片。`ariaLabel` 也照旧带 provider，读屏不依赖"组标题被念过" | verify 第 10 节 |
 | 模型列表**不提供搜索框**，且滚动条隐藏：inline `scrollbarWidth: none` + `SHAPE_CSS` 里的 `[data-dsh-effort-picker-list]::-webkit-scrollbar` | 用户 2026-10-24 要求「搜索可以不要」「滚动条隐藏」；模型多时靠上下键 / Home / End 导航（交互测试覆盖） | verify 第 10 节 + 交互测试 |
 | 面板 `width: "224px"` 与轨道 200px 同源 | 轨道不设自身宽度，撑满内容宽 = 面板宽 − 左右各 12px padding；改面板宽等于改轨道宽 | 人工 |
 | `chooseModel` 必须带上新模型的**最高档**（`efforts.at(-1).id`），既不能省略 `reasoningEffort`、也不能用路由默认档 `defaultEffort` | 省略 = 会话档位被清空 → `activeIndex = -1` → 轨道不渲染滑块头，用户看到"滑块不行"；路由默认档是"一条路由一个值"，huawei 设成 high 后连支持 max 的模型也落在 high（两条都是实测反馈）。**只影响"刚切过去落在哪一格"，滑块照旧能拖到任意档** | verify 第 10 节（含"没有 defaultEffort 的模型也要带上最高档"） |
 | 只要模型有档位，轨道上就必须画得出滑块头：`shownIndex = activeIndex >= 0 ? activeIndex : efforts.length - 1`；兜底时 `committedLabel` / `effortLabel` 补「（默认）」后缀 | 会话档位没显式设置时（官方 `/model` 切换）旧实现 `shownRatio = null` → thumb / fill 全不渲染，轨道看起来就是坏的；补后缀是为了不把兜底位置说成用户选过的档位 | verify 第 8c 组 |
-| 模型列表里非当前模型显示的是**选中它会带上的档位**（= 该模型最高档），不是 `defaultEffort` | 显示路由默认档时同一条路由每个模型都是同一个值（huawei 全显示 High），看不出谁支持 max | verify 第 10 节 |
+| 模型列表**不显示思考强度**：行内只有模型名 + 勾，`aria-label` 也只带 provider；档位只在根面板滑杆调整 | 用户 2026-10-24 明确目标：选择模型时不显示思考强度选择。切模型仍会带上该模型的最高档（见 `chooseModel` 那条），但不在列表里展示 | verify 第 10 节 |
 
 **不要顺手做的重构**：不把 `lib/` 当源码改；不给**运行期**加依赖（第三方包只能写进 `src/` 并被
 打包进产物）；不改有意的硬编码；不"美化"间距到与现状不一致。`src/` 允许多文件、允许 JSX、允许
@@ -164,7 +164,7 @@ bundle → Host 在 `/plugins` 下发布并写进浏览器 boot graph。
 22px < 滑块 25px）、进度填充与滑块同源、主题适配（轨道掺色 / 圆钮带描边 / 停靠点掺 label-primary）、拖拽只提交一次且触发器不跟手跳、键盘调档、档位未显式设置时滑块头仍在最高档且标
 「默认」、失败提示保留面板、面板落位（上方优先 / 放不下翻转 / 左右不越界）、模型下钻（**按 provider 分组**：
 组名可见且是标题行、空组不渲染、行装在组里、跨组选择提交各自的 provider、`ariaLabel` 仍带 provider、
-当前行行尾有勾；"选模型带最高档 / 列表显示选中会带上的档位"）、
+当前行行尾有勾；"选模型带最高档 / 列表不显示档位"）、
 接线形态（bundle 补丁层；带 `--patch` 时再查 profile 是手写行还是 bundle 安装）。第 12 组会把补丁里的
 id / name 与**本机实际路径**核对，所以**仓库搬家后要么重新安装 bundle，要么同步改 profile 里的路径行**
 （forward slash 形式）。
@@ -194,7 +194,7 @@ profile 是**用户的环境**，不是本仓库的一部分：`C:\Users\admin\.
 `package.json` 依赖、`dsh.profile.bundles` 以及 Loader 行都由安装器写——本仓库只提供
 `cordis.patch.yml` 那一层，不碰用户的其它配置。spec 有两种形态，装的是同一个包：
 
-- `github:qq540491950/dsh-effort-picker#v0.0.8`：**成品形态**，钉 tag（必须等于 `package.json` 的
+- `github:qq540491950/dsh-effort-picker#v0.0.9`：**成品形态**，钉 tag（必须等于 `package.json` 的
   `version`），profile 里是拷贝；
 - `D:\project\dsh-plugins\dsh-effort-picker`：**开发形态**，profile 里是 junction，`npm run build` 即刻生效。
 

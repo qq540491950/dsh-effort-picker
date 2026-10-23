@@ -612,33 +612,11 @@ function CodexEffortPickerSeat(props: SeatProps) {
 												const isPending = busy
 													&& state.pending?.provider === group.id
 													&& state.pending?.model === model.id;
-												const levels = model.reasoning?.efforts ?? [];
-												// 当前模型显示会话正在用的档位；其它模型显示**选中它会带上的那一档**
-												// （= 该模型的最高档，见 chooseModel）。
-												//
-												// 原来这里显示路由默认档（`model.reasoning.defaultEffort`），
-												// 而路由默认档是"一条路由一个值"：huawei 设成 high 之后每个模型
-												// 都显示 High，看不出谁支持 max（实测反馈：「huawei 都是 high」）。
-												const appliedEffort = levels.length > 0 ? levels[levels.length - 1].id : undefined;
-												const effortId = isCurrent
-													? (current?.reasoningEffort ?? model.reasoning?.defaultEffort ?? appliedEffort)
-													: appliedEffort;
-												const effortName = levels.find((level) => level.id === effortId)?.name ?? effortId;
-												// 档位是兜底出来的时候补「（默认）」——与触发器/顶栏同一套说法，
-												// 不把兜底档说成用户显式选过的档位。
-												const effortDefaulted = isCurrent
-													&& (current?.reasoningEffort === undefined || current?.reasoningEffort === null);
-												const effortLabel = effortName === undefined
-													? undefined
-													: effortDefaulted
-														? `${effortName}（默认）`
-														: effortName;
+												const levelCount = model.reasoning?.efforts.length ?? 0;
 												const providerName = group.name ?? group.id;
-												// 行内只显示档位名（用户要求把思考强度放到模型后边）；
-												// 读屏整句补上「当前/选中后」，不依赖视觉位置表达状态。
-												const effortState = effortLabel === undefined
-													? '无档位'
-													: `${isCurrent ? '当前' : '选中后'} ${effortLabel}`;
+												// 选择模型时**不显示思考强度**（用户 2026-10-24 明确目标）：
+												// 行内只有模型名 + 勾；档位只在根面板的滑杆上调整。
+												// 切换模型仍会带上该模型的最高档（chooseModel 的数据行为，不在这里展示）。
 												return (
 													<Row
 														key={`${group.id}/${model.id}`}
@@ -646,15 +624,12 @@ function CodexEffortPickerSeat(props: SeatProps) {
 														checked={isCurrent}
 														disabled={controlsLocked}
 														// 读屏按行的顺序念，不依赖"组标题被念过"；provider 仍写进整句，
-														// 同名模型来自不同 provider 时也分得清。
-														ariaLabel={`${model.name ?? model.id}，${providerName}，${effortState}`}
-														title={levels.length === 0 ? undefined : `${String(levels.length)} 档可选`}
+														// 同名模型来自不同 provider 时也分得清。档位不在这里出现。
+														ariaLabel={`${model.name ?? model.id}，${providerName}`}
+														title={levelCount === 0 ? undefined : `${String(levelCount)} 档可选`}
 														onClick={() => chooseModel(group, model)}
 													>
 														<span style={styles.modelName}>{model.name ?? model.id}</span>
-														{effortName === undefined ? null : (
-															<span style={styles.rowEffort}>{effortName}</span>
-														)}
 														<span style={styles.slot}>
 															{isPending ? (
 																<primitives.StateDot state="ongoing" />

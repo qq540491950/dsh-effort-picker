@@ -35,7 +35,7 @@
 | `←` / `→` | 降/升一档并提交（焦点在触发器上即可，不必先点面板） |
 | `Home` / `End` | 跳到最低/最高档 |
 | `Esc` | 退回上一层；已在根层则关闭面板 |
-| 点击标题下方的模型名（带 ›） | 下钻到模型列表：**按 provider 分框**，每个 provider 一个框（带组内模型数），框内是单行模型（模型名 + 档位 + 勾，档位紧跟在模型名后边）；当前模型显示**正在用的档位**，其它模型显示**选中它会带上的档位**（= 该模型的最高档），选中后带上该模型的最高档。不提供搜索框，列表滚动条隐藏 |
+| 点击标题下方的模型名（带 ›） | 下钻到模型列表：**按 provider 分框**，每个 provider 一个框（带组内模型数），框内是单行模型（模型名 + 勾）；**选择模型时不显示思考强度**，档位只在根面板的滑杆上调整。选中模型后会带上该模型的最高档。不提供搜索框，列表滚动条隐藏 |
 | 点击面板外 | 关闭 |
 
 档位数是**自适应**的：直接取当前模型 `reasoning.efforts` 的长度。本机
@@ -66,7 +66,7 @@
 
 | 场景 | 填什么 | 装完是什么 |
 |---|---|---|
-| 当成品用 | `github:qq540491950/dsh-effort-picker#v0.0.8`（完整写法 `git+https://github.com/qq540491950/dsh-effort-picker.git#v0.0.8` 也行） | profile 里的**拷贝**；钉住 tag，改代码要 bump 版本 + 打新 tag 再装。tag 必须与 `package.json` 的 `version` 一致（当前 `0.0.8`） |
+| 当成品用 | `github:qq540491950/dsh-effort-picker#v0.0.9`（完整写法 `git+https://github.com/qq540491950/dsh-effort-picker.git#v0.0.9` 也行） | profile 里的**拷贝**；钉住 tag，改代码要 bump 版本 + 打新 tag 再装。tag 必须与 `package.json` 的 `version` 一致（当前 `0.0.9`） |
 | 开发迭代 | `D:\project\dsh-plugins\dsh-effort-picker`（绝对路径） | profile 里的 **junction**；`npm run build` 之后 HMR 立刻看到新产物 |
 
 在 GUI 里是**侧栏「插件」→「添加插件」**（主按钮直接打开安装对话框；箭头里的「安装第三方插件」打开同一个框），
@@ -77,7 +77,7 @@
 装完界面若没变化，按 `Ctrl+R` 刷新一次。想确认台账里有没有生效，用 `cordis_inspect_query`
 （Client · `Slots.listSubTree`，root = `conversation.input.model`）看是否多了一条 `priority -1` 的 occupant。
 
-> 只有发布到 npm 之后才能直接填包名（`dsh-effort-picker` / `dsh-effort-picker@0.0.8`）；
+> 只有发布到 npm 之后才能直接填包名（`dsh-effort-picker` / `dsh-effort-picker@0.0.9`）；
 > 现在 `"private": true` 且未发布，所以要用 git 地址、绝对路径或 tarball。
 
 #### 两个必须知道的坑
@@ -172,8 +172,9 @@ node D:\project\dsh-plugins\dsh-effort-picker\tools\verify.ts `
 - **文案硬编码中文**：没有注册 locale 命名空间（避免多一处失败面）。
 - **模型列表按 provider 分框、框内平铺**：每个 provider 一个框（1px 边框 + 8px 圆角 + 3% 底色），
   框头是 `group.name ?? group.id`（11px / 600 `label-secondary`，右侧组内模型数，带底部分隔线），
-  框内每行是「模型名 + 档位 + 勾」，档位紧跟在模型名后边（当前模型显示正在用的档位，其它模型显示
-  选中后会带上的最高档）；当前行用 `color-mix(label-primary 11%, transparent)` 底色 + 行尾勾标出来。
+  框内每行是「模型名 + 勾」，**选择模型时不显示思考强度**（用户 2026-10-24 明确目标），
+  档位只在根面板的滑杆上调整；当前行用 `color-mix(label-primary 11%, transparent)` 底色 + 行尾勾标出来。
+  选中模型后仍会带上该模型的最高档（数据行为，不在列表里展示）。
   分框是为了回答"这个模型是谁家的"——用户配置的第三方路由（cpa / huawei / tengxun…）和官方
   provider 的模型混在同一个列表里，只有 `aria-label` 的时候肉眼分不出。**没有模型的 provider 不渲染空框**；
   `aria-label` 照旧带 provider（"模型名，provider，当前/选中后 档位"），读屏不依赖"组标题被念过"。

@@ -253,13 +253,6 @@ export const styles = {
 		cursor: 'pointer',
 		transition: 'background .1s ease',
 	},
-	// 行尾档位：比模型名浅一号，紧跟在模型名后面，不再单独占一整行。
-	rowEffort: {
-		flex: 'none',
-		color: 'var(--dsw-alias-label-secondary)',
-		fontSize: '12px',
-		lineHeight: '18px',
-	},
 	// 半透明菜单面上不要用 bg-layer-2（和面板几乎同色，看不出 hover）。
 	rowHover: { background: 'color-mix(in srgb, var(--dsw-alias-label-primary) 7%, transparent)' },
 	/** 当前选中行：比 hover 再深一点，像 Codex 那样一眼看出"我在这"。 */
