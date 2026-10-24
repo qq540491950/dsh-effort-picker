@@ -139,6 +139,23 @@ describe('CodexEffortPicker interaction', () => {
 		});
 	});
 
+	it('模型名过长被截断时，悬停 title 显示模型全称', async () => {
+		const user = userEvent.setup();
+		const directory = createModelDirectory();
+		render(<CodexEffortPicker {...seat(directory)} />);
+		await open(user);
+		await user.tab();
+		await user.keyboard('{Enter}');
+
+		// 行内名称被省略号截断时，悬停是唯一能看全的地方：title 必须以模型全称开头；
+		// 有档位的模型顺带保留「N 档可选」提示，无档位的只给全称。
+		expect(screen.getByRole('menuitemradio', { name: /Other Model/ })).toHaveAttribute(
+			'title',
+			'Other Model · 2 档可选',
+		);
+		expect(screen.getByRole('menuitemradio', { name: /HW One/ })).toHaveAttribute('title', 'HW One');
+	});
+
 	it('焦点移出面板会关闭', async () => {
 		const user = userEvent.setup();
 		const directory = createModelDirectory();

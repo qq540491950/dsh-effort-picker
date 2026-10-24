@@ -631,6 +631,7 @@ function CodexEffortPickerSeat(props: SeatProps) {
 													&& state.pending?.model === model.id;
 												const levelCount = model.reasoning?.efforts.length ?? 0;
 												const providerName = group.name ?? group.id;
+												const modelName = model.name ?? model.id;
 												// 选择模型时**不显示思考强度**（用户 2026-10-24 明确目标）：
 												// 行内只有模型名 + 勾；档位只在根面板的滑杆上调整。
 												// 切换模型仍会带上该模型的最高档（chooseModel 的数据行为，不在这里展示）。
@@ -642,11 +643,17 @@ function CodexEffortPickerSeat(props: SeatProps) {
 														disabled={controlsLocked}
 														// 读屏按行的顺序念，不依赖"组标题被念过"；provider 仍写进整句，
 														// 同名模型来自不同 provider 时也分得清。档位不在这里出现。
-														ariaLabel={`${model.name ?? model.id}，${providerName}`}
-														title={levelCount === 0 ? undefined : `${String(levelCount)} 档可选`}
+														ariaLabel={`${modelName}，${providerName}`}
+														// 行内名称被省略号截断时悬停是唯一能看全的地方：title 以全称开头；
+														// 有档位的模型顺带保留「N 档可选」的悬停提示。
+														title={
+															levelCount === 0
+																? modelName
+																: `${modelName} · ${String(levelCount)} 档可选`
+														}
 														onClick={() => chooseModel(group, model)}
 													>
-														<span style={styles.modelName}>{model.name ?? model.id}</span>
+														<span style={styles.modelName}>{modelName}</span>
 														<span style={styles.slot}>
 															{isPending ? (
 																<primitives.StateDot state="ongoing" />
