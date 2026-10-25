@@ -24,6 +24,7 @@
 
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { createHash } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
 import { join, dirname, resolve, isAbsolute, relative } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import vm from 'node:vm';
@@ -220,6 +221,7 @@ function textOf(tree: any): string {
 /** 只声明自检真正读的字段（包清单契约见 AGENTS.md 第 4 节）。 */
 interface PackageManifest {
 	name: string;
+	version: string;
 	exports: Record<string, string>;
 	dsh?: { client?: { platform?: string }; bundle?: { patch?: string } };
 }
@@ -496,6 +498,18 @@ check('exports["./client"] 存在', typeof manifest.exports?.['./client'] === 's
 check('exports["./package.json"] 存在', manifest.exports?.['./package.json'] === './package.json');
 check('客户端 bundle 文件真实存在', existsSync(clientPath), clientPath);
 check('dsh.client.platform === "web"', manifest.dsh?.client?.platform === 'web');
+
+// README 的安装 spec 钉的是 git tag，必须始终等于 package.json 的 version。
+// 漂移实绩：0.0.12 发布时 README 仍写着 #v0.0.11（2026-10-25 才发现）——
+// 每次发版靠手工同步 README 迟早再漏，所以让自检来守。
+const readmeText = readFileSync(join(PACKAGE_ROOT, 'README.md'), 'utf8');
+const pinnedTags = [...readmeText.matchAll(/dsh-effort-picker(?:\.git)?#v(\d+\.\d+\.\d+)/g)].map((match) => match[1]);
+check('README 里存在安装 spec（护栏有东西可守）', pinnedTags.length > 0, String(pinnedTags.length));
+check(
+	'README 安装 spec 钉住 package.json 的 version',
+	pinnedTags.every((tag) => tag === manifest.version),
+	`README=${pinnedTags.join(', ') || '（没有）'} package=${manifest.version}`,
+);
 
 // 源码是 TypeScript、产物是 lib/*.js：中间必须有一次构建。缺了这道检查就会出现
 // "改完源码、自检全绿、线上跑旧产物"——正是 AGENTS.md 第 2.3 节那类事故的翻版。
@@ -1221,6 +1235,47 @@ if (!args.includes('--patch')) {
 		check('profile patch 顶层是数组', Array.isArray(parsed), typeof parsed);
 	} else {
 		console.log('  --   跳过 YAML 解析（未传 --yaml <yaml 包目录>）');
+	}
+}
+//#endregion
+
+//#region 13. 发布纪律
+section('13) 发布纪律：git tag 与 version');
+// 纪律（AGENTS.md 第 8 节）：bump version → 提交 → git tag -a vX.Y.Z → 推 tag。
+// 同一 tag 的产物不允许变，所以"没 bump version 就打新 tag"必须在这里拦下。
+// git 不可用（tarball 安装目录里跑自检）或仓库还没有 v* tag 时，整组优雅跳过。
+// 只解析 tag 的 vX.Y.Z 前缀：预发布后缀（如 v0.0.14-rc.1）不该变成漏网之鱼，
+// 基数超过 version 就算"没 bump 就打 tag"。
+const tagVersion = (tag: string): [number, number, number] | undefined => {
+	const match = /^v(\d+)\.(\d+)\.(\d+)/.exec(tag);
+	return match === null ? undefined : [Number(match[1]), Number(match[2]), Number(match[3])];
+};
+const compare = (a: [number, number, number], b: [number, number, number]): number =>
+	a[0] - b[0] || a[1] - b[1] || a[2] - b[2];
+const current = tagVersion(`v${manifest.version}`);
+let tags: string[] | undefined;
+try {
+	tags = execFileSync('git', ['tag', '--list', 'v*'], { cwd: PACKAGE_ROOT, encoding: 'utf8' })
+		.split(/\r?\n/)
+		.map((line) => line.trim())
+		.filter((line) => line.length > 0);
+} catch {
+	// 只有"git 不可用"才允许整组跳过；护栏自身的 bug 必须照常炸出来。
+	notes.push('跳过 git tag 护栏（git 不可用或不是 git 仓库）');
+}
+if (tags !== undefined) {
+	if (current === undefined || tags.length === 0) {
+		notes.push(`跳过 git tag 护栏（version=${manifest.version}，v* tag 数=${String(tags.length)}）`);
+	} else {
+		const ahead = tags.filter((tag) => {
+			const parsed = tagVersion(tag);
+			return parsed !== undefined && compare(parsed, current) > 0;
+		});
+		check(
+			'所有 v* tag 都不超过 package.json 的 version（没 bump 就打 tag 会被拦下）',
+			ahead.length === 0,
+			ahead.join(', '),
+		);
 	}
 }
 //#endregion

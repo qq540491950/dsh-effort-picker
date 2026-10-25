@@ -1,6 +1,6 @@
 {
   "name": "dsh-effort-picker",
-  "version": "0.0.12",
+  "version": "0.0.13",
   "private": true,
   "engines": {
     "dsh": ">=0.2.0-rc.2 <0.3.0"

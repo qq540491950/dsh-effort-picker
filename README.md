@@ -66,7 +66,7 @@
 
 | 场景 | 填什么 | 装完是什么 |
 |---|---|---|
-| 当成品用 | `github:qq540491950/dsh-effort-picker#v0.0.11`（完整写法 `git+https://github.com/qq540491950/dsh-effort-picker.git#v0.0.11` 也行） | profile 里的**拷贝**；钉住 tag，改代码要 bump 版本 + 打新 tag 再装。tag 必须与 `package.json` 的 `version` 一致（当前 `0.0.11`） |
+| 当成品用 | `github:qq540491950/dsh-effort-picker#v0.0.13`（完整写法 `git+https://github.com/qq540491950/dsh-effort-picker.git#v0.0.13` 也行） | profile 里的**拷贝**；钉住 tag，改代码要 bump 版本 + 打新 tag 再装。tag 必须与 `package.json` 的 `version` 一致（自检护栏盯着这条） |
 | 开发迭代 | `D:\project\dsh-plugins\dsh-effort-picker`（绝对路径） | profile 里的 **junction**；`npm run build` 之后 HMR 立刻看到新产物 |
 
 在 GUI 里是**侧栏「插件」→「添加插件」**（主按钮直接打开安装对话框；箭头里的「安装第三方插件」打开同一个框），

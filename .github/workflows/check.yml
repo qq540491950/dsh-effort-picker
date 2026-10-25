@@ -1,0 +1,24 @@
+name: check
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        # verify 的发布纪律护栏要枚举 git tag，浅克隆拿不到 tag。
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: npm run check

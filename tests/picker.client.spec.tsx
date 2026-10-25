@@ -1,5 +1,5 @@
 import { createElement as h } from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { CodexEffortPicker } from '../src/client/picker';
@@ -139,6 +139,34 @@ describe('CodexEffortPicker interaction', () => {
 		});
 	});
 
+	it('模型名下钻入口不带恒为 false 的 aria-expanded', async () => {
+		const user = userEvent.setup();
+		const directory = createModelDirectory();
+		render(<CodexEffortPicker {...seat(directory)} />);
+		await open(user);
+		await user.tab();
+
+		// 下钻会把标题区整块卸载，没有"展开/折叠"状态可表达；留着 aria-expanded={false}
+		// 只会让读屏念出一个永远是"折叠"的开关。入口语义由 aria-haspopup="menu" 表达。
+		expect(screen.getByRole('button', { name: /选择模型，当前/ })).not.toHaveAttribute('aria-expanded');
+	});
+
+	it('模型未声明推理能力时，沿用档位带「（沿用）」后缀而不是裸 id', async () => {
+		const user = userEvent.setup();
+		const directory = createModelDirectory(snapshot({
+			current: { provider: 'huawei', model: 'hw-1' },
+			retainedEffort: 'high',
+		}));
+		render(<CodexEffortPicker {...seat(directory)} />);
+		const trigger = await open(user);
+		const dialog = screen.getByRole('dialog', { name: '模型与推理等级' });
+
+		// hw-1 没有 reasoning 声明，面板回落到会话沿用的档位。裸显 `high` 与档位显示名
+		// （Low/Medium/…）风格脱节，也说不清这格不是用户在滑杆上选的——补「（沿用）」。
+		expect(within(dialog).getByText('high（沿用）')).toBeInTheDocument();
+		expect(trigger).toHaveTextContent('high（沿用）');
+	});
+
 	it('模型名过长被截断时，悬停 title 显示模型全称', async () => {
 		const user = userEvent.setup();
 		const directory = createModelDirectory();
@@ -263,6 +291,29 @@ describe('CodexEffortPicker interaction', () => {
 		await user.tab();
 		await user.keyboard('{Enter}');
 		expect(await screen.findByText('暂无可用模型')).toBeInTheDocument();
+	});
+
+	it('选择被拒：已知错误码翻成中文，未知码保留原文', async () => {
+		const user = userEvent.setup();
+		// 提交一次档位（触发器上的 ArrowRight → 下一档），让 directory.select 走到拒绝分支。
+		const commit = async (): Promise<void> => {
+			await open(user);
+			await user.keyboard('{ArrowRight}');
+		};
+
+		const held = createModelDirectory();
+		held.select.mockResolvedValue({ ok: false, error: { code: 'session/writer-held', message: 'held' } });
+		const first = render(<CodexEffortPicker {...seat(held)} />);
+		await commit();
+		expect(await screen.findByText('另一个 DSH 实例正在写这个会话，请先退出它再重试')).toBeInTheDocument();
+		first.unmount();
+
+		// 官方 select 契约只有 code/message：没收录的码原样透出，不吞信息。
+		const unknown = createModelDirectory();
+		unknown.select.mockResolvedValue({ ok: false, error: { code: 'weird/code', message: 'boom' } });
+		render(<CodexEffortPicker {...seat(unknown)} />);
+		await commit();
+		expect(await screen.findByText('weird/code: boom')).toBeInTheDocument();
 	});
 
 	it('点击面板外关闭，点击面板内不关闭', async () => {

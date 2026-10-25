@@ -28,6 +28,7 @@ Codex 风格的推理档位面板。
 | `cordis.patch.yml` | bundle 自带的补丁层：`insert` 一行把本插件接进 Loader（`dsh.bundle.patch` 指向它） | 中——写错等于"装了却没生效" |
 | `lib/client.js` / `lib/index.js` | **产物**，不要手改 | 手改会被下次构建覆盖，且自检第 1 组会报"产物与源码不一致" |
 | `tools/verify.ts` | 离线自检：纯 Node、无依赖，用 `node:vm` 跑**真实的** `lib/client.js` | 低；改它必须同步改断言，**不许为了让它变绿而放宽断言** |
+| `.github/workflows/check.yml` | CI：push 到 main / 打 tag 时跑 `npm run check` | 低 |
 | `tests/**` / `vitest.config.ts` / `tsconfig.test.json` | 真实 React + jsdom 的交互测试（焦点、Tab、pending、拖拽、失败态） | 中；测试只允许进 `devDependencies`，不得进产物 `require` 面 |
 | `README.md` | 面向使用者的介绍与使用说明 | 低 |
 | `AGENTS.md` | 本文件（工程约束） | 低 |
@@ -109,6 +110,7 @@ ctx.inject(["slots", "modelDirectories", "sessions", "remote", "remote.session"]
 | 面板 `width: "224px"` 与轨道 200px 同源 | 轨道不设自身宽度，撑满内容宽 = 面板宽 − 左右各 12px padding；改面板宽等于改轨道宽 | 人工 |
 | `chooseModel` 必须带上新模型的**最高档**（`efforts.at(-1).id`），既不能省略 `reasoningEffort`、也不能用路由默认档 `defaultEffort` | 省略 = 会话档位被清空 → `activeIndex = -1` → 轨道不渲染滑块头，用户看到"滑块不行"；路由默认档是"一条路由一个值"，huawei 设成 high 后连支持 max 的模型也落在 high（两条都是实测反馈）。**只影响"刚切过去落在哪一格"，滑块照旧能拖到任意档** | verify 第 10 节（含"没有 defaultEffort 的模型也要带上最高档"） |
 | 只要模型有档位，轨道上就必须画得出滑块头：`shownIndex = activeIndex >= 0 ? activeIndex : efforts.length - 1`；兜底时 `committedLabel` / `effortLabel` 补「（默认）」后缀 | 会话档位没显式设置时（官方 `/model` 切换）旧实现 `shownRatio = null` → thumb / fill 全不渲染，轨道看起来就是坏的；补后缀是为了不把兜底位置说成用户选过的档位 | verify 第 8c 组 |
+| 模型未声明 reasoning 时回落显示的沿用档位，标签必须带「（沿用）」后缀 | 这一格不是用户在滑杆上选的，且是裸 id（如 `high`），与档位显示名（Low/Medium/…）风格脱节；不撒谎原则同「（默认）」 | 交互测试 |
 | 模型列表**不显示思考强度**：行内只有模型名 + 勾，`aria-label` 也只带 provider；**下钻到模型页时整块隐藏根面板的档位标题与滑杆**（标题区 + `EffortTrack` 只在 `pane === "root"` 渲染）；模型页**没有"返回"按钮**，退回根面板用 Esc / Shift+Tab（或直接选模型）；档位只在根面板滑杆调整 | 用户 2026-10-24 明确目标：选择模型时不显示思考强度选择（包括红色标题区）。切模型仍会带上该模型的最高档（见 `chooseModel` 那条），但不在列表里展示 | verify 第 10 节 |
 
 **不要顺手做的重构**：不把 `lib/` 当源码改；不给**运行期**加依赖（第三方包只能写进 `src/` 并被
@@ -148,16 +150,17 @@ bundle → Host 在 `/plugins` 下发布并写进浏览器 boot graph。
    可选参数：`--patch <profile 的 cordis.patch.yml 路径>` 校验"profile 接线了没有"——手写 insert 行
    或把本包列进 `dsh.profile.bundles`，两种形态都算通过；再带 `--yaml <yaml 包目录>` 用真实 YAML
    解析器校验（该目录需有 `dist/index.js`）。
-6. **必须看到 verify 的 `全部通过 ✓`、测试的 `10 passed`，且退出码 0**。失败时 verify 会打印
+6. **必须看到 verify 的 `全部通过 ✓`、测试的 `14 passed`，且退出码 0**。失败时 verify 会打印
    `失败 N 项：` 并 `exit 1`。
 7. 只有第 6 步过了才有资格说"改好了"。**禁止**在没跑自检/测试、或它们失败的情况下汇报成功；
    也禁止用"看起来没问题"替代实际输出。
 8. 提交（第 6 节）并推送。
 
-自检覆盖 16 个分组（含 `4b` 降级、`8b` 连续跟手、`8c` 档位未设置时的滑块头、`11b` 面板落位）共 130 条
-断言（带 `--patch` 时 132 条）；另有一套 Vitest + jsdom 交互测试（10 条）覆盖 verify 结构上看不到的
+自检覆盖 18 个分组（含 `4b` 降级、`8b` 连续跟手、`8c` 档位未设置时的滑块头、`11b` 面板落位）共 133 条
+断言（带 `--patch` 时 135 条）；另有一套 Vitest + jsdom 交互测试（14 条）覆盖 verify 结构上看不到的
 焦点、portal、Tab 顺序、pending 和拖拽取消。verify 自身覆盖的是包清单契约与**构建新鲜度**（`src/` 改了没构建会直接失败，新增文件与
-纯类型文件也算）、宿主 `apply`、
+纯类型文件也算）、**发布纪律**（README 安装 spec 钉住 `version`、git tag 不超过 `version`——
+0.0.12 发布时 README 仍写 #v0.0.11 的漂移实绩，第 13 组不再让它复发）、宿主 `apply`、
 模块协议（含"产物只向平台要种子模块"）、`priority -1` 注册与注入清单回归护栏、`resolve()` 解析、解析失败
 时座位内降级（不退役条目、上报控制台、排自动重试）、子代理会话短路、触发器文案（含"不放前导图标、
 紧凑模式保留档位、档位比模型名浅"）、滑杆 ARIA、停靠点数量、形状（轨道与填充都是胶囊、滑块是正圆、轨道
@@ -224,3 +227,5 @@ profile 是**用户的环境**，不是本仓库的一部分：`C:\Users\admin\.
   `tsconfig.tools.json` 的 `erasableSyntaxOnly` 守着这条）；pnpm 12.14.0；TypeScript 5.9.3；esbuild 0.28.2；
   Vitest 5.0.5 / Vite 8.3.5 / jsdom 30.1.3（只在 devDependencies，不进产物）。
 - 目标座位：`conversation.input.model`；被遮蔽的官方插件：`@deepseek-ai/dsh-client-ui-model-selection`。
+- DSH 0.3 一旦发布，本包会被 `engines.dsh`（`>=0.2.0-rc.2 <0.3.0`）的版本闸门挡住（装不上/被禁用）。
+  升级 DSH 前先验这个范围：确认座位/服务契约没变，再放宽上限并重跑全套自检。

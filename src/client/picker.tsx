@@ -28,6 +28,11 @@ import type { SeatProps } from './services';
 /** 面板的两个页面：档位滑杆（根）与模型列表（下钻）。 */
 type Pane = 'root' | 'model';
 
+/** 已知 `select()` 错误码的中文说明；官方契约只有 code/message，没收录的码原样透出。 */
+const FAILURE_TEXT: Record<string, string> = {
+	'session/writer-held': '另一个 DSH 实例正在写这个会话，请先退出它再重试',
+};
+
 /** 面板的 `position: fixed` 落位。 */
 interface PanelPoint {
 	left: number;
@@ -123,20 +128,23 @@ function CodexEffortPickerSeat(props: SeatProps) {
 	 * 面板标题用的档位名：拖动中跟随最近的停靠点（面板是唯一该跟手变化的地方）。
 	 */
 	const titleName = previewIndex >= 0 ? efforts[previewIndex].name : (effectiveEffort ?? '默认');
-	const effortLabel =
-		reasoning === undefined ? state.retainedEffort : effortDefaulted ? `${titleName}（默认）` : titleName;
+	/**
+	 * 模型没有 reasoning 声明时，标题与触发器回落到的档位：会话里沿用的旧值
+	 * （不是用户在这根滑杆上选的），补「（沿用）」后缀说明来路，也不再裸显 id。
+	 */
+	const retainedLabel =
+		state.retainedEffort === undefined ? undefined : `${state.retainedEffort}（沿用）`;
 	/**
 	 * 已提交档位名：触发器（面板**外面**那个控件）与无障碍文案用它。
 	 * 触发器必须跟着已提交档位走，不能跟拖动预览——否则在面板里拖档时，
 	 * 下方那一行会在 Low/Medium/High 之间来回跳，宽度也跟着抖。
 	 */
 	const committedName = shownIndex >= 0 ? efforts[shownIndex].name : (effectiveEffort ?? '默认');
-	const committedLabel =
-		reasoning === undefined
-			? state.retainedEffort
-			: effortDefaulted
-				? `${committedName}（默认）`
-				: committedName;
+	/** 档位名 → 标签：模型没有 reasoning 声明时回落「沿用」值；兜底位置补「（默认）」后缀，不撒谎。 */
+	const labelFor = (name: string): string | undefined =>
+		reasoning === undefined ? retainedLabel : effortDefaulted ? `${name}（默认）` : name;
+	const effortLabel = labelFor(titleName);
+	const committedLabel = labelFor(committedName);
 	const modelLabel =
 		current === null || current === undefined
 			? state.status === 'loading'
@@ -321,11 +329,7 @@ function CodexEffortPickerSeat(props: SeatProps) {
 			return;
 		}
 		const code = outcome.error.code ?? 'unknown';
-		setFailure(
-			code === 'session/writer-held'
-				? '另一个 DSH 实例正在写这个会话，请先退出它再重试'
-				: `${code}: ${outcome.error.message ?? ''}`,
-		);
+		setFailure(FAILURE_TEXT[code] ?? `${code}: ${outcome.error.message ?? ''}`);
 	};
 
 	/** 提交一个档位（一次手势只提交一次）。 */
@@ -563,7 +567,6 @@ function CodexEffortPickerSeat(props: SeatProps) {
 								type="button"
 								aria-label={`选择模型，当前 ${modelLabel}`}
 								aria-haspopup="menu"
-								aria-expanded={false}
 								title={modelLabel}
 								disabled={controlsLocked}
 								style={modelLineStyle}
