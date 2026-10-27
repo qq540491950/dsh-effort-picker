@@ -1,6 +1,6 @@
 {
   "name": "dsh-effort-picker",
-  "version": "0.0.13",
+  "version": "0.0.14",
   "private": true,
   "engines": {
     "dsh": ">=0.2.0-rc.2 <0.3.0"
@@ -8,8 +8,10 @@
   "description": "DSH Web 客户端插件：把 composer 的思考模式（reasoning effort）换成 Codex 风格的档位滑杆（浅蓝滑轨 + 白圆钮）。TypeScript 源码 + esbuild 产物。",
   "type": "module",
   "main": "lib/index.js",
+  "icon": "./assets/icon.svg",
   "files": [
     "lib",
+    "assets/icon.svg",
     "cordis.patch.yml",
     "README.md"
   ],

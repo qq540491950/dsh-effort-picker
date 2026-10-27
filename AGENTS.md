@@ -25,6 +25,7 @@ Codex 风格的推理档位面板。
 | `tools/build.ts` | 构建：esbuild 把 `src/` 打成 `lib/client.js`（外套 `__ModuleLoader__` 注册壳）与 `lib/index.js`，原子替换 + 写 `.build-manifest.json` | 高——外壳与 `id` 契约在这里，写错就整体不加载 |
 | `tsconfig.json` / `tsconfig.tools.json` | `src/` 与 `tools/` 的类型检查（classic JSX：`jsxFactory = h`） | 中——配置漂了就查不出类型错 |
 | `package.json` | 包清单契约（第 4 节）+ devDeps + 脚本 | 中——改错就整体不加载 |
+| `assets/icon.svg` | 插件页「已安装插件」那一行的方块插画（`package.json` 顶层 `icon` 指向它，`files` 负责带进包）：64×64 + `rx="14"` 圆角底 + 纯白墨迹，与 dsh-mcp-manager / dsh-skill-manager / dsh-hooks / dsh-continue 的图标同一套规格 | 低——但**别改成 `currentColor`**：静态图标以 `<img>` 进 DOM，拿不到页面 CSS，深色主题下会糊成一片 |
 | `cordis.patch.yml` | bundle 自带的补丁层：`insert` 一行把本插件接进 Loader（`dsh.bundle.patch` 指向它） | 中——写错等于"装了却没生效" |
 | `lib/client.js` / `lib/index.js` | **产物**，不要手改 | 手改会被下次构建覆盖，且自检第 1 组会报"产物与源码不一致" |
 | `tools/verify.ts` | 离线自检：纯 Node、无依赖，用 `node:vm` 跑**真实的** `lib/client.js` | 低；改它必须同步改断言，**不许为了让它变绿而放宽断言** |
@@ -96,6 +97,8 @@ ctx.inject(["slots", "modelDirectories", "sessions", "remote", "remote.session"]
 | `lib/*.js` 是**产物**，禁止手改 | 手改会被下一次构建覆盖；"只看 lib/ 不看 src/" 迟早把修复弄丢 | verify 第 1 组（`.build-manifest.json` 的 sha256 比对） |
 | 宿主半边零 `import`、导出 `apply` | 它只当接线柱；多引入依赖就多一个失败面 | verify 第 2 节 |
 | 文案硬编码中文、**不注册 locale 命名空间** | 有意少一个失败面 | 约定 |
+| 包清单顶层 `icon` 指向 `./assets/icon.svg`，且 `files` 收着 `assets/icon.svg` | 插件页每行显示的方块插画来自**包根清单的 `icon`**（宿主读文件转成 data URL 交给 `<img>`）；缺任一条那一行就退回默认灰插画，和隔壁 MCP / Skills / Hooks / Continue 几枚图标不成一套——而这类回归**界面上不报错**，只能靠断言守 | verify 第 1 节（三条断言） |
+| 图标是静态 SVG 资产：`#3E63DD` 写死、属性里不许出现 `currentColor` | 以 `<img>` 渲染，继承不到页面 CSS；`currentColor` 会退化成初始黑，深色主题下糊成一片 | verify 第 1 节 |
 | 数据面只走官方 `ctx.modelDirectories` 的 `directory.store` / `directory.select()`，写入只作用于**下一次请求** | 与 `/model` 命令看到的状态天然一致 | 约定 |
 | 滑块 `THUMB_SIZE = 25`、`styles.thumb` 的 `25px` 与 `styles.track.height` 的 `22px` 是一套比例 | 参考图（Codex 档位面板，面板 310px）里轨道 30px、圆钮 34.5px，即占面板宽的 9.7% / 11.1%；本面板 224px 等比换成 22px / 25px，比值 1.14:1，圆钮上下各探出 1.5px。三者不一致就会看出偏移 | 人工 |
 | 进度填充是**纯色 `#88c0d0`**（不掺 token、无渐变、无高光） | 这是从参考图实测取的颜色（136/192/208），参考图的填充横竖都是这个值。早先那版 brand 渐变 + 白高光是照着另一张图猜的，已被明确撤掉——**别"美化"回渐变** | 人工 |
@@ -156,10 +159,11 @@ bundle → Host 在 `/plugins` 下发布并写进浏览器 boot graph。
    也禁止用"看起来没问题"替代实际输出。
 8. 提交（第 6 节）并推送。
 
-自检覆盖 18 个分组（含 `4b` 降级、`8b` 连续跟手、`8c` 档位未设置时的滑块头、`11b` 面板落位）共 133 条
-断言（带 `--patch` 时 135 条）；另有一套 Vitest + jsdom 交互测试（14 条）覆盖 verify 结构上看不到的
+自检覆盖 18 个分组（含 `4b` 降级、`8b` 连续跟手、`8c` 档位未设置时的滑块头、`11b` 面板落位）共 136 条
+断言（带 `--patch` 时 138 条）；另有一套 Vitest + jsdom 交互测试（14 条）覆盖 verify 结构上看不到的
 焦点、portal、Tab 顺序、pending 和拖拽取消。verify 自身覆盖的是包清单契约与**构建新鲜度**（`src/` 改了没构建会直接失败，新增文件与
-纯类型文件也算）、**发布纪律**（README 安装 spec 钉住 `version`、git tag 不超过 `version`——
+纯类型文件也算）、**插件卡片图标**（清单顶层 `icon`、`files` 收录、静态资产不许 `currentColor`）、
+**发布纪律**（README 安装 spec 钉住 `version`、git tag 不超过 `version`——
 0.0.12 发布时 README 仍写 #v0.0.11 的漂移实绩，第 13 组不再让它复发）、宿主 `apply`、
 模块协议（含"产物只向平台要种子模块"）、`priority -1` 注册与注入清单回归护栏、`resolve()` 解析、解析失败
 时座位内降级（不退役条目、上报控制台、排自动重试）、子代理会话短路、触发器文案（含"不放前导图标、
@@ -197,7 +201,7 @@ profile 是**用户的环境**，不是本仓库的一部分：`C:\Users\admin\.
 `package.json` 依赖、`dsh.profile.bundles` 以及 Loader 行都由安装器写——本仓库只提供
 `cordis.patch.yml` 那一层，不碰用户的其它配置。spec 有两种形态，装的是同一个包：
 
-- `github:qq540491950/dsh-effort-picker#v0.0.11`：**成品形态**，钉 tag（必须等于 `package.json` 的
+- `github:qq540491950/dsh-effort-picker#v0.0.14`：**成品形态**，钉 tag（必须等于 `package.json` 的
   `version`），profile 里是拷贝；
 - `D:\project\dsh-plugins\dsh-effort-picker`：**开发形态**，profile 里是 junction，`npm run build` 即刻生效。
 

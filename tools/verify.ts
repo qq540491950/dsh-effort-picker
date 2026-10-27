@@ -31,6 +31,8 @@ import vm from 'node:vm';
 import type { DirectorySnapshot, EffortLevel, ModelGroup, ModelSelection } from '../src/client/model.ts';
 
 const PACKAGE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+/** 插件页「已安装插件」那一行左边的方块插画（`package.json` 顶层 `icon` 指向它，`files` 负责带进包）。 */
+const ICON_PATH = join(PACKAGE_ROOT, 'assets', 'icon.svg');
 
 const failures: string[] = [];
 const notes: string[] = [];
@@ -222,6 +224,8 @@ function textOf(tree: any): string {
 interface PackageManifest {
 	name: string;
 	version: string;
+	icon?: string;
+	files?: string[];
 	exports: Record<string, string>;
 	dsh?: { client?: { platform?: string }; bundle?: { patch?: string } };
 }
@@ -498,6 +502,28 @@ check('exports["./client"] 存在', typeof manifest.exports?.['./client'] === 's
 check('exports["./package.json"] 存在', manifest.exports?.['./package.json'] === './package.json');
 check('客户端 bundle 文件真实存在', existsSync(clientPath), clientPath);
 check('dsh.client.platform === "web"', manifest.dsh?.client?.platform === 'web');
+
+// 插件页「已安装插件」那一行的方块插画：宿主读的是**包根清单的顶层 `icon`**（转成 data URL 交给 `<img>`）。
+// 缺任一条（清单没声明 / 文件不在 / 没被 `files` 带进包），那一行就退回默认灰插画，
+// 和隔壁 MCP / Skills / Hooks / Continue 几枚图标不成一套——而这类回归界面上**不报错**，只能靠断言守。
+const iconText = existsSync(ICON_PATH) ? readFileSync(ICON_PATH, 'utf8') : '';
+check(
+	'清单声明了插件卡片图标（顶层 icon）',
+	manifest.icon === './assets/icon.svg',
+	`实际 ${JSON.stringify(manifest.icon)}`,
+);
+check(
+	'图标文件存在且被 files 收进包',
+	iconText !== '' && (manifest.files ?? []).includes('assets/icon.svg'),
+	`存在=${String(iconText !== '')} files=${JSON.stringify(manifest.files)}`,
+);
+check(
+	'图标是静态资产（64x64 圆角底板 + 写死颜色，属性里不许用 currentColor）',
+	/width="64"[^>]*height="64"/.test(iconText) &&
+		/<rect[^>]*rx="14"[^>]*fill="#3E63DD"/.test(iconText) &&
+		// 只查属性，注释里提到 currentColor 是在解释「为什么不用它」，不算违规。
+		/(?:fill|stroke|style)="[^"]*currentColor/.test(iconText) === false,
+);
 
 // README 的安装 spec 钉的是 git tag，必须始终等于 package.json 的 version。
 // 漂移实绩：0.0.12 发布时 README 仍写着 #v0.0.11（2026-10-25 才发现）——

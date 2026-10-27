@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="Effort Picker">
+  <!--
+    bundle 卡片图标（`package.json` 的顶层 `icon` 指向本文件）：插件页「已安装插件」那一行左边的方块插画。
+    为什么这样画（与 dsh-mcp-manager / dsh-skill-manager / dsh-hooks / dsh-continue 的图标同一套规格）：
+      1. 64x64 画布 + `<rect rx="14">` 圆角底色块 + 纯白墨迹。静态图标以 `<img>` 进 DOM，
+         拿不到页面 CSS，**不能用 `currentColor`**（它会退化成初始黑，深色主题下几乎看不见）。
+      2. 底色 `#3E63DD` 与 MCP / Hooks / Continue 图标同色（Skills 是相邻的 `#3B6FE0`）——同一张列表里
+         几个方块看上去是一套。
+      3. 图形语义就是本插件在做的事：**一条档位滑轨 + 一颗圆钮**。左段是已走过的档位，右段是还剩的档位，
+         圆钮落在偏右的位置——对应「推理强度（Low / Medium / High / Max）滑杆」，也就是把 composer 里
+         那串「模型名 · 思考模式」换成一行可拖的档位。滑轨与圆钮之间留一道底色缝，24px 下也不会糊成一团。
+  -->
+  <rect x="0" y="0" width="64" height="64" rx="14" fill="#3E63DD"/>
+  <!-- 滑轨两段 + 圆钮：都是纯白填充，形状粗一点才与隔壁几枚图标的墨迹等重 -->
+  <g fill="#FFFFFF">
+    <rect x="9" y="28.25" width="15.5" height="7.5" rx="3.75"/>
+    <rect x="45" y="28.25" width="9.5" height="7.5" rx="3.75"/>
+    <circle cx="34.5" cy="32" r="11"/>
+  </g>
+</svg>

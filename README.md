@@ -26,6 +26,11 @@
 `--dsh-composer-model-text-display: none`，官方选择器那时只剩一枚图标，我们则**保留档位**——
 `Max ⌄` 这样一格，总比只剩一个 chevron 好认。
 
+插件页「已安装插件」那一行左边的方块插画来自仓库自带的 [assets/icon.svg](assets/icon.svg)
+（`package.json` 顶层的 `icon` 指向它，`files` 负责带进包）：64×64 圆角底色块 + 白色「滑轨 + 圆钮」，
+就是本插件那根档位滑杆。底色与 MCP / Skills / Hooks / Continue 那几枚图标同一套（`#3E63DD`），
+同一张列表里是一套。
+
 ## 交互
 
 | 操作 | 行为 |
@@ -66,7 +71,7 @@
 
 | 场景 | 填什么 | 装完是什么 |
 |---|---|---|
-| 当成品用 | `github:qq540491950/dsh-effort-picker#v0.0.13`（完整写法 `git+https://github.com/qq540491950/dsh-effort-picker.git#v0.0.13` 也行） | profile 里的**拷贝**；钉住 tag，改代码要 bump 版本 + 打新 tag 再装。tag 必须与 `package.json` 的 `version` 一致（自检护栏盯着这条） |
+| 当成品用 | `github:qq540491950/dsh-effort-picker#v0.0.14`（完整写法 `git+https://github.com/qq540491950/dsh-effort-picker.git#v0.0.14` 也行） | profile 里的**拷贝**；钉住 tag，改代码要 bump 版本 + 打新 tag 再装。tag 必须与 `package.json` 的 `version` 一致（自检护栏盯着这条） |
 | 开发迭代 | `D:\project\dsh-plugins\dsh-effort-picker`（绝对路径） | profile 里的 **junction**；`npm run build` 之后 HMR 立刻看到新产物 |
 
 在 GUI 里是**侧栏「插件」→「添加插件」**（主按钮直接打开安装对话框；箭头里的「安装第三方插件」打开同一个框），
@@ -82,8 +87,9 @@
 
 #### 两个必须知道的坑
 
-1. **`file` 字段别删**。git / tarball 安装会打包整个仓库，`"files": ["lib", "cordis.patch.yml", "README.md"]`
-   把它收成"产物 + 补丁层 + 说明"；少了 `cordis.patch.yml` 会被判 `not-bundle` 而回滚。
+1. **`file` 字段别删**。git / tarball 安装会打包整个仓库，`"files": ["lib", "assets/icon.svg", "cordis.patch.yml", "README.md"]`
+   把它收成"产物 + 图标 + 补丁层 + 说明"；少了 `cordis.patch.yml` 会被判 `not-bundle` 而回滚，
+   少了 `assets/icon.svg` 则插件页那一行退回默认灰插画。
 2. **从本地目录切到 URL 安装时，先清掉 junction**：`install_bundle` 装目录会把
    `profile/node_modules/dsh-effort-picker` 做成指向仓库的 junction，`remove_bundle` 之后它**可能还留着**；
    接着装 URL 版时 pnpm 会试着把整个开发目录（含 `node_modules` 里的符号链接）导入 store，报
@@ -249,6 +255,7 @@ dsh-effort-picker/
   lib/client.js      产物：window.__ModuleLoader__ 懒 CJS bundle（**不要手改**）
   lib/index.js       产物：宿主半边 ESM
   lib/.build-manifest.json  产物清单：输入的 sha256，自检用它判断"源码改了没构建"
+  assets/icon.svg    插件页那一行的方块插画（清单顶层 icon 指向它，files 负责带进包）
   package.json       包清单：exports{"./client"} + dsh.client{platform:"web"} + dsh.bundle.patch
   cordis.patch.yml   bundle 自带的补丁层：insert 一行把本插件接进 Loader
   tsconfig.json      src/ 的类型检查（classic JSX：jsxFactory = h）
